@@ -27,14 +27,14 @@
         </div>
 
         <div id="remote" class="hidden pt-6 border-t-2 border-dashed border-gray-800 space-y-4">
-            <h2 class="text-center text-yellow-500 font-bold italic uppercase">Manager Remote</h2>
+            <h2 class="text-center text-yellow-500 font-bold italic uppercase tracking-widest">Manager Remote</h2>
             <div class="grid grid-cols-2 gap-2">
-                <button onclick="move('out')" class="bg-gray-900 border border-gray-700 p-4 rounded-lg font-bold">OUT (+$1)</button>
-                <button onclick="move('single')" class="bg-gray-900 border border-gray-700 p-4 rounded-lg font-bold">1B (-$1)</button>
-                <button onclick="move('double')" class="bg-gray-900 border border-gray-700 p-4 rounded-lg font-bold">2B (-$2)</button>
-                <button onclick="move('hr')" class="bg-yellow-500 text-black p-4 rounded-lg font-bold">HOME RUN</button>
+                <button onclick="move('out', this)" class="bg-gray-900 border border-gray-700 p-5 rounded-xl font-bold active:bg-red-600 transition-colors">OUT (+$1)</button>
+                <button onclick="move('single', this)" class="bg-gray-900 border border-gray-700 p-5 rounded-xl font-bold active:bg-green-600 transition-colors">1B (-$1)</button>
+                <button onclick="move('double', this)" class="bg-gray-900 border border-gray-700 p-5 rounded-xl font-bold active:bg-green-600 transition-colors">2B (-$2)</button>
+                <button onclick="move('hr', this)" class="bg-yellow-500 text-black p-5 rounded-xl font-black active:bg-white transition-colors uppercase">Home Run</button>
             </div>
-            <p id="share-link" class="text-[10px] text-center text-blue-400 break-all"></p>
+            <p id="share-link" class="text-[10px] text-center text-blue-400 break-all pt-4 font-mono"></p>
         </div>
     </div>
 
@@ -46,7 +46,6 @@
         let roster = [];
         let r_id = "";
 
-        // ADD PLAYER
         document.getElementById('add-btn').onclick = () => {
             const el = document.getElementById('p-input');
             if (el.value.trim()) {
@@ -58,18 +57,17 @@
 
         function draw() {
             document.getElementById('p-list').innerHTML = roster.map((p, i) => 
-                `<div class="bg-gray-900 p-2 rounded flex justify-between"><span>${i+1}. ${p.name}</span><button onclick="rem(${i})" class="text-red-500">X</button></div>`
+                `<div class="bg-gray-900 p-3 rounded-lg flex justify-between border border-gray-800 uppercase text-[10px]"><span>${i+1}. ${p.name}</span><button onclick="rem(${i})" class="text-red-500 font-black">X</button></div>`
             ).join('');
         }
 
         function rem(i) { roster.splice(i, 1); draw(); }
 
-        // CREATE ROOM
         document.getElementById('go-btn').onclick = async () => {
             r_id = document.getElementById('r-input').value.trim().toUpperCase();
             if (!r_id || roster.length === 0) return alert("Add names and a code!");
 
-            const { error } = await sb.from('games').insert([{ 
+            const { error } = await sb.from('games').upsert([{ 
                 id: r_id, mlb_game_id: 0, players: roster, pot_total: roster.length, current_holder_index: 0 
             }]);
 
@@ -77,27 +75,55 @@
                 alert("Error: " + error.message);
             } else {
                 document.getElementById('remote').classList.remove('hidden');
-                const link = window.location.origin + "/index.html?id=" + r_id;
-                document.getElementById('share-link').innerHTML = "Scoreboard Link:<br>" + link;
+                const link = window.location.origin + "/index.html?id=" + encodeURIComponent(r_id);
+                document.getElementById('share-link').innerHTML = "Scoreboard Link:<br><a href='"+link+"' target='_blank' class='underline'>"+link+"</a>";
                 alert("Game Created!");
             }
         };
 
-        // REMOTE LOGIC
-        async function move(type) {
-            let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
-            let p = g.pot_total;
+        async function move(type, btn) {
+            // Visual feedback that button was pressed
+            const originalColor = btn.style.backgroundColor;
+            btn.style.opacity = "0.5";
+
+            // 1. Fetch the absolute freshest data
+            let { data: g, error } = await sb.from('games').select('*').eq('id', r_id).single();
+            if (error || !g) return alert("Database error. Try creating the room again.");
+
+            let pot = parseFloat(g.pot_total);
             let list = g.players;
-            let i = g.current_holder_index;
+            let i = parseInt(g.current_holder_index);
 
-            if (type === 'out') { p += 1; list[i].balance -= 1; }
-            else if (type === 'single') { let pay = Math.min(p, 1); p -= pay; list[i].balance += pay; }
-            else if (type === 'double') { let pay = Math.min(p, 2); p -= pay; list[i].balance += pay; }
-            else if (type === 'hr') { list[i].balance += p; p = 0; }
+            // 2. Perform Math
+            if (type === 'out') { 
+                pot += 1.0; 
+                list[i].balance -= 1.0; 
+            } else if (type === 'single') { 
+                let pay = Math.min(pot, 1.0); 
+                pot -= pay; 
+                list[i].balance += pay; 
+            } else if (type === 'double') { 
+                let pay = Math.min(pot, 2.0); 
+                pot -= pay; 
+                list[i].balance += pay; 
+            } else if (type === 'hr') { 
+                list[i].balance += pot; 
+                pot = 0.0; 
+            }
 
-            await sb.from('games').update({
-                pot_total: p, players: list, current_holder_index: (i + 1) % list.length
+            // 3. Move to next player
+            let next_i = (i + 1) % list.length;
+
+            // 4. Update Database
+            const { error: upError } = await sb.from('games').update({
+                pot_total: pot, 
+                players: list, 
+                current_holder_index: next_i
             }).eq('id', r_id);
+
+            if (upError) alert("Update failed: " + upError.message);
+            
+            btn.style.opacity = "1";
         }
     </script>
 </body>

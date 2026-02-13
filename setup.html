@@ -9,11 +9,11 @@
 </head>
 <body class="bg-black text-white p-6 font-sans">
     <div class="max-w-md mx-auto space-y-6">
-        <h1 class="text-2xl font-black italic text-yellow-500 uppercase tracking-tighter">Cup Manager</h1>
+        <h1 class="text-2xl font-black italic text-yellow-500 uppercase tracking-tighter text-center">Cup Manager</h1>
 
         <div id="setup-area" class="space-y-4">
             <div class="space-y-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. Add Lineup</p>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none">1. Add Lineup</p>
                 <div class="flex gap-2">
                     <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold">
                     <button id="add-btn" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
@@ -30,12 +30,15 @@
             </div>
 
             <div class="grid grid-cols-2 gap-2">
-                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all">OUT (+$1)</button>
+                <button onclick="move('strikeout', this)" class="bg-red-900/40 border-2 border-red-600 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all italic underline">K Strikeout (+$2)</button>
+                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all">Fly/Ground Out (+$1)</button>
+                
                 <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all">1B (-$1)</button>
                 <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all">2B (-$2)</button>
                 <button onclick="move('triple', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all text-yellow-500 underline">3B (-$3)</button>
-                <button onclick="move('hr', this)" class="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase text-[10px] col-span-2">Home Run (CLEAR)</button>
-                <button onclick="move('eject', this)" class="bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px] col-span-2 shadow-lg shadow-red-900/50">🚨 PLAYER EJECTED (+$20) 🚨</button>
+                <button onclick="move('hr', this)" class="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase text-[10px]">Home Run (CLEAR)</button>
+                
+                <button onclick="move('eject', this)" class="bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px] col-span-2 shadow-lg shadow-red-900/50 mt-2">🚨 PLAYER EJECTED (+$20) 🚨</button>
             </div>
 
             <div class="pt-4 space-y-3">
@@ -102,7 +105,9 @@
             let list = g.players;
             let i = parseInt(g.current_holder_index);
 
-            if (type === 'out') { pot += 1; list[i].balance -= 1; }
+            // UPDATED LOGIC FOR THE TWO TYPES OF OUTS
+            if (type === 'strikeout') { pot += 2; list[i].balance -= 2; }
+            else if (type === 'out') { pot += 1; list[i].balance -= 1; }
             else if (type === 'single') { let pay = Math.min(pot, 1); pot -= pay; list[i].balance += pay; }
             else if (type === 'double') { let pay = Math.min(pot, 2); pot -= pay; list[i].balance += pay; }
             else if (type === 'triple') { let pay = Math.min(pot, 3); pot -= pay; list[i].balance += pay; }

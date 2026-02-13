@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scoreboard | Pass The Cup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 text-white p-4 font-sans min-h-screen">
+    <div class="max-w-md mx-auto space-y-6">
+        <div class="text-center bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-2xl">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Cup Balance</p>
+            <h2 id="pot-display" class="text-7xl font-black text-green-400 tracking-tighter">$0.00</h2>
+        </div>
+
+        <div id="holder-card" class="bg-blue-600 rounded-2xl p-6 shadow-xl border-b-4 border-blue-800">
+            <p class="text-[10px] font-black uppercase text-blue-100 tracking-widest">Holding the Cup</p>
+            <h3 id="current-name" class="text-4xl font-black uppercase italic tracking-tight">WAITING...</h3>
+        </div>
+
+        <div id="player-list" class="space-y-2"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('id');
+
+        async function fetchAndListen() {
+            let { data: game } = await supabase.from('games').select('*').eq('id', roomId).single();
+            if (game) render(game);
+
+            supabase.channel('live-updates').on('postgres_changes', { 
+                event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${roomId}` 
+            }, payload => render(payload.new)).subscribe();
+        }
+
+        function render(game) {
+            document.getElementById('pot-display').innerText = `$${game.pot_total.toFixed(2)}`;
+            document.getElementById('current-name').innerText = game.players[game.current_holder_index].name;
+            
+            document.getElementById('player-list').innerHTML = game.players.map((p, i) => `
+                <div class="flex justify-between p-4 rounded-xl ${i === game.current_holder_index ? 'bg-blue-900/40 border-l-4 border-blue-500' : 'bg-slate-900 border border-slate-800'}">
+                    <span class="font-bold uppercase">${p.name}</span>
+                    <span class="font-mono ${p.balance >= 0 ? 'text-green-400' : 'text-red-400'}">${p.balance >= 0 ? '+' : ''}${p.balance.toFixed(2)}</span>
+                </div>
+            `).join('');
+        }
+        fetchAndListen();
+    </script>
+</body>
+</html>

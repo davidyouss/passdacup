@@ -20,30 +20,30 @@
                 </div>
                 <div id="p-list" class="space-y-1 text-sm font-bold"></div>
             </div>
-            <button id="go-btn" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg shadow-yellow-500/20">Start New Game</button>
+            <button id="go-btn" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase">Start Game</button>
         </div>
 
         <div id="remote" class="hidden space-y-6 border-t-2 border-dashed border-gray-800 pt-6">
+            
             <div class="bg-blue-600 p-4 rounded-xl shadow-lg text-center">
-                <p class="text-[9px] font-black uppercase text-blue-100 tracking-widest">Currently Holding Cup</p>
+                <p class="text-[9px] font-black uppercase text-blue-100 tracking-widest leading-none mb-1">Cup is currently with:</p>
                 <h2 id="up-now" class="text-3xl font-black uppercase italic tracking-tighter">---</h2>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-red-600 transition-all">OUT (+$1)</button>
-                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600 transition-all">1B (-$1)</button>
-                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600 transition-all">2B (-$2)</button>
-                <button onclick="move('hr', this)" class="bg-yellow-500 text-black p-5 rounded-xl font-black uppercase text-xs active:bg-white transition-all">Home Run</button>
+                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:scale-95 transition-all">OUT (+$1)</button>
+                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:scale-95 transition-all">1B (-$1)</button>
+                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:scale-95 transition-all">2B (-$2)</button>
+                <button onclick="move('hr', this)" class="bg-yellow-500 text-black p-5 rounded-xl font-black uppercase text-xs active:scale-95 transition-all">Home Run</button>
             </div>
 
-            <div class="pt-4 space-y-4 bg-gray-900/50 p-4 rounded-2xl border border-gray-800">
-                <p class="text-[10px] text-center font-bold text-gray-500 uppercase tracking-widest">Invite Friends to Scoreboard</p>
-                <button onclick="copyLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-sm uppercase tracking-tight">
-                    Copy Link to Clipboard
+            <div class="pt-6 border-t border-gray-900">
+                <p class="text-[10px] text-center font-bold text-gray-500 uppercase mb-3 tracking-widest">Share Scoreboard With Friends</p>
+                <button id="copy-btn" onclick="copyScoreboardLink(this)" class="w-full bg-white text-black font-black py-4 rounded-xl text-sm uppercase flex items-center justify-center gap-2">
+                    Copy Scoreboard Link
                 </button>
-                <div class="text-center">
-                    <p id="room-display" class="text-yellow-500 font-mono font-bold text-xs tracking-widest uppercase"></p>
-                    <p id="link-text" class="text-[10px] text-blue-400 break-all font-medium mt-2 opacity-70"></p>
+                <div class="text-center mt-4">
+                    <p id="room-display" class="text-yellow-500 font-mono font-bold text-xs tracking-[.25em]"></p>
                 </div>
             </div>
         </div>
@@ -56,7 +56,7 @@
 
         let roster = [];
         let r_id = "";
-        let finalLink = "";
+        let scoreboardLink = "";
 
         function genID() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
 
@@ -92,20 +92,20 @@
                 document.getElementById('remote').classList.remove('hidden');
                 document.getElementById('up-now').innerText = roster[0].name;
                 document.getElementById('room-display').innerText = "ROOM: " + r_id;
-                finalLink = window.location.origin + "/index.html?id=" + r_id;
-                document.getElementById('link-text').innerText = finalLink;
+                
+                // GENERATE THE SCOREBOARD LINK (NOT THE SETUP LINK)
+                scoreboardLink = window.location.origin + "/index.html?id=" + r_id;
             }
         };
 
-        // NEW: Copy to Clipboard Function
-        function copyLink(btn) {
-            navigator.clipboard.writeText(finalLink).then(() => {
-                const originalText = btn.innerText;
-                btn.innerText = "COPIED!";
-                btn.classList.replace('bg-white', 'bg-green-500');
+        function copyScoreboardLink(btn) {
+            navigator.clipboard.writeText(scoreboardLink).then(() => {
+                const old = btn.innerText;
+                btn.innerText = "COPIED TO CLIPBOARD!";
+                btn.classList.add('bg-green-500');
                 setTimeout(() => {
-                    btn.innerText = originalText;
-                    btn.classList.replace('bg-green-500', 'bg-white');
+                    btn.innerText = old;
+                    btn.classList.remove('bg-green-500');
                 }, 2000);
             });
         }

@@ -13,7 +13,7 @@
 
         <div id="setup-area" class="space-y-4">
             <div class="space-y-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none">1. Add Lineup</p>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. Add Lineup</p>
                 <div class="flex gap-2">
                     <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold">
                     <button id="add-btn" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
@@ -30,20 +30,18 @@
             </div>
 
             <div class="grid grid-cols-2 gap-2">
-                <button onclick="move('strikeout', this)" class="bg-red-900/40 border-2 border-red-600 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all italic underline">K Strikeout (+$2)</button>
-                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all">Fly/Ground Out (+$1)</button>
-                
-                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all">1B (-$1)</button>
-                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all">2B (-$2)</button>
-                <button onclick="move('triple', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 transition-all text-yellow-500 underline">3B (-$3)</button>
+                <button onclick="move('strikeout', this)" class="bg-red-900/40 border-2 border-red-600 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 italic underline">K Strikeout (+$2)</button>
+                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95">Fly/Ground Out (+$1)</button>
+                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95">1B (-$1)</button>
+                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95">2B (-$2)</button>
+                <button onclick="move('triple', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 text-yellow-500 underline">3B (-$3)</button>
                 <button onclick="move('hr', this)" class="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase text-[10px]">Home Run (CLEAR)</button>
-                
-                <button onclick="move('eject', this)" class="bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px] col-span-2 shadow-lg shadow-red-900/50 mt-2">🚨 PLAYER EJECTED (+$20) 🚨</button>
+                <button onclick="move('eject', this)" class="bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px] col-span-2 mt-2">🚨 PLAYER EJECTED (+$20) 🚨</button>
             </div>
 
             <div class="pt-4 space-y-3">
                 <button id="copy-btn" onclick="copyScoreboardLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-xs uppercase">Copy Scoreboard Link</button>
-                <p id="room-display" class="text-center text-yellow-500 font-mono font-bold text-[10px] tracking-widest"></p>
+                <p id="room-display" class="text-center text-yellow-500 font-mono font-bold text-[10px] tracking-widest uppercase"></p>
             </div>
         </div>
     </div>
@@ -104,20 +102,20 @@
             let pot = parseFloat(g.pot_total);
             let list = g.players;
             let i = parseInt(g.current_holder_index);
+            let eventMsg = "";
 
-            // UPDATED LOGIC FOR THE TWO TYPES OF OUTS
-            if (type === 'strikeout') { pot += 2; list[i].balance -= 2; }
-            else if (type === 'out') { pot += 1; list[i].balance -= 1; }
-            else if (type === 'single') { let pay = Math.min(pot, 1); pot -= pay; list[i].balance += pay; }
-            else if (type === 'double') { let pay = Math.min(pot, 2); pot -= pay; list[i].balance += pay; }
-            else if (type === 'triple') { let pay = Math.min(pot, 3); pot -= pay; list[i].balance += pay; }
-            else if (type === 'hr') { list[i].balance += pot; pot = 0; }
-            else if (type === 'eject') { pot += 20; list[i].balance -= 20; }
+            if (type === 'strikeout') { pot += 2; list[i].balance -= 2; eventMsg = `${list[i].name} Struck Out! (+$2)`; }
+            else if (type === 'out') { pot += 1; list[i].balance -= 1; eventMsg = `${list[i].name} Grounded/Flyed Out (+$1)`; }
+            else if (type === 'single') { let pay = Math.min(pot, 1); pot -= pay; list[i].balance += pay; eventMsg = `${list[i].name} hit a Single! (-$1)`; }
+            else if (type === 'double') { let pay = Math.min(pot, 2); pot -= pay; list[i].balance += pay; eventMsg = `${list[i].name} hit a Double! (-$2)`; }
+            else if (type === 'triple') { let pay = Math.min(pot, 3); pot -= pay; list[i].balance += pay; eventMsg = `${list[i].name} hit a TRIPLE! (-$3)`; }
+            else if (type === 'hr') { list[i].balance += pot; eventMsg = `${list[i].name} HIT A HOME RUN! POT CLEARED!`; pot = 0; }
+            else if (type === 'eject') { pot += 20; list[i].balance -= 20; eventMsg = `🚨 ${list[i].name} WAS EJECTED! (+$20) 🚨`; }
 
             let next_i = (i + 1) % list.length;
             document.getElementById('up-now').innerText = list[next_i].name;
 
-            await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i }).eq('id', r_id);
+            await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: eventMsg }).eq('id', r_id);
             btn.style.opacity = "1";
         }
     </script>

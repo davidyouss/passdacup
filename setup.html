@@ -22,8 +22,8 @@
             </div>
 
             <div class="space-y-2 pt-4 border-t border-gray-800">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. Select MLB Game (Optional)</p>
-                <button onclick="findGames()" class="w-full bg-gray-800 p-3 rounded-lg text-xs font-bold uppercase border border-gray-700 hover:bg-gray-700">Find Today's Games</button>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. Select MLB Game</p>
+                <button onclick="findGames()" class="w-full bg-gray-800 p-3 rounded-lg text-xs font-bold uppercase border border-gray-700 hover:bg-gray-700">Find Games (Test: July 10 2025)</button>
                 <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500"></select>
             </div>
 
@@ -32,7 +32,7 @@
 
         <div id="remote" class="hidden space-y-4 border-t-2 border-dashed border-gray-800 pt-6">
             <div id="live-indicator" class="flex items-center justify-center gap-2 text-[10px] font-bold text-green-500 animate-pulse hidden">
-                <span class="w-2 h-2 bg-green-500 rounded-full"></span> LIVE MLB SYNC ACTIVE
+                <span class="w-2 h-2 bg-green-500 rounded-full"></span> MLB AUTO-SYNC ACTIVE
             </div>
             
             <div class="bg-blue-600 p-4 rounded-xl shadow-lg text-center">
@@ -50,9 +50,10 @@
                 <button onclick="move('eject', this)" class="bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px] col-span-2">🚨 PLAYER EJECTED (+$20) 🚨</button>
             </div>
             
-            <div class="bg-gray-900 p-3 rounded-xl border border-gray-800 text-center">
-                <p class="text-[9px] text-gray-500 uppercase font-bold">Latest Play-by-Play</p>
-                <p id="pbp-text" class="text-[11px] italic text-gray-300">Waiting for data...</p>
+            <div class="bg-gray-900 p-3 rounded-xl border border-gray-800 space-y-2">
+                <p class="text-[9px] text-gray-500 uppercase font-bold text-center border-b border-gray-800 pb-1">Live Play-by-Play Feed</p>
+                <p id="pbp-text" class="text-[11px] italic text-yellow-500 text-center py-1">Waiting for next play...</p>
+                <div id="play-history-list" class="space-y-1 pt-2"></div>
             </div>
 
             <button id="copy-btn" onclick="copyScoreboardLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-xs uppercase">Copy Scoreboard Link</button>
@@ -60,7 +61,7 @@
     </div>
 
     <script>
-        // INSERT YOUR SUPABASE CREDENTIALS HERE
+        // *** CONFIGURATION ***
         const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
@@ -69,9 +70,10 @@
         let r_id = "";
         let selectedGamePk = null;
         let lastProcessedPlayIndex = -1;
+        let playHistory = [];
         let scoreboardLink = "";
 
-        // 1. ADD PLAYER LOGIC
+        // *** ROSTER LOGIC ***
         document.getElementById('add-btn').onclick = () => {
             const el = document.getElementById('p-input');
             const name = el.value.trim();
@@ -97,36 +99,75 @@
             drawRoster();
         }
 
-        // 2. MLB GAME FINDER
+        // *** MLB API LOGIC ***
         async function findGames() {
-    try {
-        // HARDCODED TEST DATE: July 10, 2025
-        const testDate = "2025-07-10"; 
-        const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${testDate}`);
-        const data = await resp.json();
-        const select = document.getElementById('game-select');
-        
-        if (!data.dates || data.dates.length === 0) {
-            alert("No games found for this test date.");
-            return;
+            try {
+                // TEST DATE: July 10, 2025. Swap back to 'today' when season starts.
+                const testDate = "2025-07-10"; 
+                const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${testDate}`);
+                const data = await resp.json();
+                const select = document.getElementById('game-select');
+                
+                if (!data.dates || data.dates.length === 0) {
+                    alert("No games found.");
+                    return;
+                }
+
+                select.innerHTML = '<option value="">-- Choose Game --</option>';
+                data.dates[0].games.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g.gamePk;
+                    opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`;
+                    select.appendChild(opt);
+                });
+                select.classList.remove('hidden');
+            } catch (e) {
+                console.error("MLB API Error:", e);
+            }
         }
 
-        select.innerHTML = '<option value="">-- Choose 2025 Test Game --</option>';
-        data.dates[0].games.forEach(g => {
-            const opt = document.createElement('option');
-            opt.value = g.gamePk;
-            opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name} (Final)`;
-            select.appendChild(opt);
-        });
-        select.classList.remove('hidden');
-        console.log("Found games for test date:", testDate);
-    } catch (e) {
-        console.error("MLB API Error:", e);
-    }
-}
-        // 3. START GAME
+        async function checkMLB() {
+            if (!selectedGamePk) return;
+            const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
+            const data = await resp.json();
+            const plays = data.allPlays;
+            if (!plays || plays.length === 0) return;
+
+            // THROTTLE: Increment by 1 so we don't blast through a finished game
+            const nextPlayIndex = lastProcessedPlayIndex + 1;
+
+            if (nextPlayIndex < plays.length) {
+                const play = plays[nextPlayIndex];
+                if (play.result && play.result.description) {
+                    const desc = play.result.description;
+                    document.getElementById('pbp-text').innerText = desc;
+                    processPlay(play.result.event.toLowerCase(), desc);
+                    lastProcessedPlayIndex = nextPlayIndex;
+                }
+            }
+        }
+
+        function processPlay(event, desc) {
+            // Update History UI
+            playHistory.unshift(desc);
+            if (playHistory.length > 5) playHistory.pop();
+            const historyEl = document.getElementById('play-history-list');
+            historyEl.innerHTML = playHistory.map(p => 
+                `<p class="text-[10px] border-b border-gray-800 py-1 text-gray-400 italic">${p}</p>`
+            ).join('');
+
+            // Trigger Cup Logic
+            if (event.includes('strikeout')) move('strikeout');
+            else if (event.includes('out')) move('out');
+            else if (event.includes('single')) move('single');
+            else if (event.includes('double')) move('double');
+            else if (event.includes('triple')) move('triple');
+            else if (event.includes('home_run')) move('hr');
+        }
+
+        // *** GAME START & MOVE LOGIC ***
         document.getElementById('go-btn').onclick = async () => {
-            if (roster.length < 1) return alert("Add at least one player to the lineup!");
+            if (roster.length < 1) return alert("Add players!");
             
             selectedGamePk = document.getElementById('game-select').value;
             r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -136,11 +177,11 @@
                 players: roster, 
                 pot_total: roster.length, 
                 current_holder_index: 0,
-                last_event: "Game Started!" 
+                last_event: "Play Ball!" 
             }]);
 
             if (error) {
-                alert("Database Error: " + error.message);
+                alert("Error: " + error.message);
             } else {
                 document.getElementById('setup-area').classList.add('hidden');
                 document.getElementById('remote').classList.remove('hidden');
@@ -149,47 +190,10 @@
 
                 if(selectedGamePk) {
                     document.getElementById('live-indicator').classList.remove('hidden');
-                    setInterval(checkMLB, 15000); // Check MLB every 15 seconds
+                    setInterval(checkMLB, 15000); 
                 }
             }
         };
-
-        function copyScoreboardLink(btn) {
-            navigator.clipboard.writeText(scoreboardLink).then(() => {
-                const old = btn.innerText;
-                btn.innerText = "LINK COPIED!";
-                setTimeout(() => btn.innerText = old, 2000);
-            });
-        }
-
-        // 4. MLB SYNC & MOVE LOGIC
-        async function checkMLB() {
-            if (!selectedGamePk) return;
-            const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
-            const data = await resp.json();
-            const plays = data.allPlays;
-            if (!plays || plays.length === 0) return;
-
-            const latestIndex = plays.length - 1;
-            if (latestIndex > lastProcessedPlayIndex) {
-                const play = plays[latestIndex];
-                if (play.about.isComplete) {
-                    const desc = play.result.description;
-                    document.getElementById('pbp-text').innerText = desc;
-                    processPlay(play.result.event.toLowerCase(), desc);
-                    lastProcessedPlayIndex = latestIndex;
-                }
-            }
-        }
-
-        function processPlay(event, desc) {
-            if (event.includes('strikeout')) move('strikeout');
-            else if (event.includes('out')) move('out');
-            else if (event.includes('single')) move('single');
-            else if (event.includes('double')) move('double');
-            else if (event.includes('triple')) move('triple');
-            else if (event.includes('home_run')) move('hr');
-        }
 
         async function move(type, btn) {
             if (btn) btn.style.opacity = "0.5";
@@ -219,6 +223,14 @@
             }).eq('id', r_id);
             
             if (btn) btn.style.opacity = "1";
+        }
+
+        function copyScoreboardLink(btn) {
+            navigator.clipboard.writeText(scoreboardLink).then(() => {
+                const old = btn.innerText;
+                btn.innerText = "LINK COPIED!";
+                setTimeout(() => btn.innerText = old, 2000);
+            });
         }
     </script>
 </body>

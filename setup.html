@@ -7,120 +7,97 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-950 text-white p-6 font-sans">
-    <div class="max-w-md mx-auto space-y-8">
-        
-        <header class="text-center">
-            <h1 class="text-3xl font-black italic text-yellow-500 uppercase tracking-tighter">Start A Game</h1>
-        </header>
+<body class="bg-black text-white p-6">
+    <div class="max-w-md mx-auto space-y-6">
+        <h1 class="text-2xl font-black italic text-yellow-500 uppercase">Setup Game</h1>
 
         <div class="space-y-2">
-            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">1. Select MLB Game</label>
-            <select id="game-select" class="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-sm font-bold">
-                <option value="748532">Spring Training - Game 1</option>
-                <option value="748533">Spring Training - Game 2</option>
-            </select>
-        </div>
-
-        <div class="space-y-2">
-            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">2. Add Players (In Order)</label>
-            <div class="flex space-x-2">
-                <input id="player-input" type="text" placeholder="Name" class="flex-grow bg-slate-900 border border-slate-800 p-4 rounded-xl font-bold">
-                <button id="add-btn" class="bg-blue-600 px-6 rounded-xl font-black text-xl">+</button>
+            <p class="text-xs font-bold text-gray-500 uppercase">1. Add Your Friends</p>
+            <div class="flex gap-2">
+                <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none">
+                <button id="add-btn" class="bg-blue-600 px-6 rounded-lg font-bold">+</button>
             </div>
-            <div id="lineup-list" class="space-y-2 pt-2">
-                </div>
+            <div id="p-list" class="space-y-1 text-sm font-bold"></div>
         </div>
 
-        <div class="space-y-2 pt-4 border-t border-slate-800">
-            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">3. Create Room Name</label>
-            <input id="room-id" type="text" placeholder="E.G. YANKS" class="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl uppercase font-black tracking-widest">
-            <button id="launch-btn" class="w-full bg-yellow-500 text-slate-950 font-black py-5 rounded-2xl shadow-xl uppercase mt-4">Create Game Room</button>
+        <div class="space-y-2 pt-4 border-t border-gray-800">
+            <p class="text-xs font-bold text-gray-500 uppercase">2. Room Name</p>
+            <input id="r-input" type="text" placeholder="ROOM CODE" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg uppercase font-black">
+            <button id="go-btn" class="w-full bg-yellow-500 text-black font-black py-4 rounded-lg uppercase mt-2">Create Room</button>
         </div>
 
-        <div id="manager-panel" class="hidden border-t-2 border-dashed border-slate-800 pt-6 space-y-4">
-            <h2 class="text-center text-yellow-500 font-black italic uppercase">Manager Remote</h2>
+        <div id="remote" class="hidden pt-6 border-t-2 border-dashed border-gray-800 space-y-4">
+            <h2 class="text-center text-yellow-500 font-bold italic uppercase">Manager Remote</h2>
             <div class="grid grid-cols-2 gap-2">
-                <button onclick="manualMove('out')" class="bg-slate-800 p-4 rounded-xl font-bold text-xs">OUT (+$1)</button>
-                <button onclick="manualMove('single')" class="bg-slate-800 p-4 rounded-xl font-bold text-xs">1B (-$1)</button>
-                <button onclick="manualMove('double')" class="bg-slate-800 p-4 rounded-xl font-bold text-xs">2B (-$2)</button>
-                <button onclick="manualMove('hr')" class="bg-yellow-500 text-black p-4 rounded-xl font-bold text-xs">HOME RUN</button>
+                <button onclick="move('out')" class="bg-gray-900 border border-gray-700 p-4 rounded-lg font-bold">OUT (+$1)</button>
+                <button onclick="move('single')" class="bg-gray-900 border border-gray-700 p-4 rounded-lg font-bold">1B (-$1)</button>
+                <button onclick="move('double')" class="bg-gray-900 border border-gray-700 p-4 rounded-lg font-bold">2B (-$2)</button>
+                <button onclick="move('hr')" class="bg-yellow-500 text-black p-4 rounded-lg font-bold">HOME RUN</button>
             </div>
+            <p id="share-link" class="text-[10px] text-center text-blue-400 break-all"></p>
         </div>
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
+        const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
+        const sb = supabase.createClient(S_URL, S_KEY);
 
-        let lineup = [];
-        let activeRoom = "";
+        let roster = [];
+        let r_id = "";
 
-        // ADD PLAYER LOGIC
-        document.getElementById('add-btn').addEventListener('click', () => {
-            const input = document.getElementById('player-input');
-            const name = input.value.trim();
-            if (name) {
-                lineup.push({ name: name, balance: 0 });
-                input.value = "";
-                render();
+        // ADD PLAYER
+        document.getElementById('add-btn').onclick = () => {
+            const el = document.getElementById('p-input');
+            if (el.value.trim()) {
+                roster.push({ name: el.value.trim(), balance: 0 });
+                el.value = "";
+                draw();
             }
-        });
+        };
 
-        function render() {
-            const container = document.getElementById('lineup-list');
-            container.innerHTML = lineup.map((p, i) => `
-                <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 flex justify-between uppercase text-xs font-bold">
-                    <span>${i + 1}. ${p.name}</span>
-                    <button onclick="removeP(${i})" class="text-red-500 px-2">X</button>
-                </div>
-            `).join('');
+        function draw() {
+            document.getElementById('p-list').innerHTML = roster.map((p, i) => 
+                `<div class="bg-gray-900 p-2 rounded flex justify-between"><span>${i+1}. ${p.name}</span><button onclick="rem(${i})" class="text-red-500">X</button></div>`
+            ).join('');
         }
 
-        function removeP(index) {
-            lineup.splice(index, 1);
-            render();
-        }
+        function rem(i) { roster.splice(i, 1); draw(); }
 
-        // LAUNCH GAME LOGIC
-        document.getElementById('launch-btn').addEventListener('click', async () => {
-            activeRoom = document.getElementById('room-id').value.trim().toUpperCase();
-            if (!activeRoom || lineup.length === 0) return alert("Add names and a room code!");
+        // CREATE ROOM
+        document.getElementById('go-btn').onclick = async () => {
+            r_id = document.getElementById('r-input').value.trim().toUpperCase();
+            if (!r_id || roster.length === 0) return alert("Add names and a code!");
 
-            const { error } = await supabase.from('games').insert([{ 
-                id: activeRoom, 
-                mlb_game_id: 123, 
-                players: lineup, 
-                pot_total: lineup.length, 
-                current_holder_index: 0 
+            const { error } = await sb.from('games').insert([{ 
+                id: r_id, mlb_game_id: 0, players: roster, pot_total: roster.length, current_holder_index: 0 
             }]);
 
             if (error) {
                 alert("Error: " + error.message);
             } else {
-                document.getElementById('manager-panel').classList.remove('hidden');
-                alert("Room Created! Share index.html?id=" + activeRoom);
+                document.getElementById('remote').classList.remove('hidden');
+                const link = window.location.origin + "/index.html?id=" + r_id;
+                document.getElementById('share-link').innerHTML = "Scoreboard Link:<br>" + link;
+                alert("Game Created!");
             }
-        });
+        };
 
-        // MANUAL MOVE LOGIC
-        async function manualMove(type) {
-            let { data: game } = await supabase.from('games').select('*').eq('id', activeRoom).single();
-            let pot = parseFloat(game.pot_total);
-            let players = game.players;
-            let idx = game.current_holder_index;
+        // REMOTE LOGIC
+        async function move(type) {
+            let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
+            let p = g.pot_total;
+            let list = g.players;
+            let i = g.current_holder_index;
 
-            if (type === 'out') { pot += 1; players[idx].balance -= 1; }
-            else if (type === 'single') { let pay = Math.min(pot, 1); pot -= pay; players[idx].balance += pay; }
-            else if (type === 'double') { let pay = Math.min(pot, 2); pot -= pay; players[idx].balance += pay; }
-            else if (type === 'hr') { players[idx].balance += pot; pot = 0; }
+            if (type === 'out') { p += 1; list[i].balance -= 1; }
+            else if (type === 'single') { let pay = Math.min(p, 1); p -= pay; list[i].balance += pay; }
+            else if (type === 'double') { let pay = Math.min(p, 2); p -= pay; list[i].balance += pay; }
+            else if (type === 'hr') { list[i].balance += p; p = 0; }
 
-            await supabase.from('games').update({
-                pot_total: pot,
-                players: players,
-                current_holder_index: (idx + 1) % players.length
-            }).eq('id', activeRoom);
+            await sb.from('games').update({
+                pot_total: p, players: list, current_holder_index: (i + 1) % list.length
+            }).eq('id', r_id);
         }
     </script>
 </body>

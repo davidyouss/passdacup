@@ -8,11 +8,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-black text-white p-4 font-sans min-h-screen">
-    <div class="max-w-md mx-auto space-y-6">
+    <div class="max-w-md mx-auto space-y-4">
         
         <div class="text-center bg-gray-900 p-8 rounded-3xl border border-gray-800 shadow-2xl">
-            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-[.2em]">Cup Balance</p>
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cup Balance</p>
             <h2 id="pot-display" class="text-7xl font-black text-green-400 tracking-tighter">$0.00</h2>
+        </div>
+
+        <div id="action-box" class="bg-gray-900/50 border border-gray-800 p-3 rounded-xl text-center hidden">
+            <p id="last-event" class="text-yellow-500 font-bold italic text-[11px] uppercase tracking-tight"></p>
         </div>
 
         <div id="holder-card" class="bg-blue-600 rounded-2xl p-6 shadow-xl border-b-4 border-blue-800">
@@ -20,7 +24,7 @@
             <h3 id="current-name" class="text-4xl font-black uppercase italic tracking-tight">WAITING...</h3>
         </div>
 
-        <div id="player-list" class="space-y-2"></div>
+        <div id="player-list" class="space-y-2 pb-10"></div>
     </div>
 
     <script>
@@ -41,6 +45,12 @@
 
         function render(g) {
             document.getElementById('pot-display').innerText = `$${parseFloat(g.pot_total).toFixed(2)}`;
+            
+            if (g.last_event) {
+                document.getElementById('action-box').classList.remove('hidden');
+                document.getElementById('last-event').innerText = g.last_event;
+            }
+
             const list = g.players;
             const idx = g.current_holder_index;
             document.getElementById('current-name').innerText = list[idx].name;

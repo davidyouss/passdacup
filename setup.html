@@ -18,16 +18,16 @@
                     <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold">
                     <button id="add-btn" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
                 </div>
-                <div id="p-list" class="space-y-1 text-sm font-bold"></div>
+                <div id="p-list" class="space-y-2 mt-2"></div>
             </div>
 
-            <div class="space-y-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. Select MLB Game</p>
-                <button onclick="findGames()" class="w-full bg-gray-800 p-3 rounded-lg text-xs font-bold uppercase border border-gray-700">Find Today's Games</button>
+            <div class="space-y-2 pt-4 border-t border-gray-800">
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. Select MLB Game (Optional)</p>
+                <button onclick="findGames()" class="w-full bg-gray-800 p-3 rounded-lg text-xs font-bold uppercase border border-gray-700 hover:bg-gray-700">Find Today's Games</button>
                 <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500"></select>
             </div>
 
-            <button id="go-btn" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg shadow-yellow-500/20">Start Game</button>
+            <button id="go-btn" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg shadow-yellow-500/20 mt-4">Start Game</button>
         </div>
 
         <div id="remote" class="hidden space-y-4 border-t-2 border-dashed border-gray-800 pt-6">
@@ -47,80 +47,129 @@
                 <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">2B (-$2)</button>
                 <button onclick="move('triple', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">3B (-$3)</button>
                 <button onclick="move('hr', this)" class="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase text-[10px]">HR (CLEAR)</button>
+                <button onclick="move('eject', this)" class="bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px] col-span-2">🚨 PLAYER EJECTED (+$20) 🚨</button>
             </div>
             
             <div class="bg-gray-900 p-3 rounded-xl border border-gray-800 text-center">
                 <p class="text-[9px] text-gray-500 uppercase font-bold">Latest Play-by-Play</p>
-                <p id="pbp-text" class="text-[11px] italic text-gray-300">Waiting for first pitch...</p>
+                <p id="pbp-text" class="text-[11px] italic text-gray-300">Waiting for data...</p>
             </div>
+
+            <button id="copy-btn" onclick="copyScoreboardLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-xs uppercase">Copy Scoreboard Link</button>
         </div>
     </div>
 
     <script>
-        const S_URL = 'YOUR_SUPABASE_URL';
-        const S_KEY = 'YOUR_SUPABASE_KEY';
+        // INSERT YOUR SUPABASE CREDENTIALS HERE
+        const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
+        const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
 
         let roster = [];
         let r_id = "";
         let selectedGamePk = null;
         let lastProcessedPlayIndex = -1;
+        let scoreboardLink = "";
 
-        // 1. GAME FINDER LOGIC
-        async function findGames() {
-            const today = new Date().toISOString().split('T')[0];
-            const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${today}`);
-            const data = await resp.json();
-            const select = document.getElementById('game-select');
-            select.innerHTML = '<option value="">-- Choose Game --</option>';
-            
-            data.dates[0].games.forEach(g => {
-                const opt = document.createElement('option');
-                opt.value = g.gamePk;
-                opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`;
-                select.appendChild(opt);
-            });
-            select.classList.remove('hidden');
-        }
-
-        // 2. SETUP LOGIC
+        // 1. ADD PLAYER LOGIC
         document.getElementById('add-btn').onclick = () => {
             const el = document.getElementById('p-input');
-            if (el.value.trim()) { roster.push({ name: el.value.trim(), balance: 0 }); el.value = ""; draw(); }
+            const name = el.value.trim();
+            if (name) {
+                roster.push({ name: name, balance: 0 });
+                el.value = "";
+                drawRoster();
+            }
         };
 
-        function draw() {
-            document.getElementById('p-list').innerHTML = roster.map((p, i) => 
-                `<div class="bg-gray-900 p-3 rounded-lg flex justify-between border border-gray-800 text-[11px] uppercase"><span>${i+1}. ${p.name}</span></div>`
-            ).join('');
+        function drawRoster() {
+            const listEl = document.getElementById('p-list');
+            listEl.innerHTML = roster.map((p, i) => `
+                <div class="bg-gray-900 p-3 rounded-lg flex justify-between items-center border border-gray-800">
+                    <span class="text-sm font-bold uppercase tracking-tight">${i + 1}. ${p.name}</span>
+                    <button onclick="removePlayer(${i})" class="text-red-500 font-black px-2">X</button>
+                </div>
+            `).join('');
         }
 
+        function removePlayer(index) {
+            roster.splice(index, 1);
+            drawRoster();
+        }
+
+        // 2. MLB GAME FINDER
+        async function findGames() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${today}`);
+                const data = await resp.json();
+                const select = document.getElementById('game-select');
+                
+                if (!data.dates || data.dates.length === 0) {
+                    alert("No games found for today.");
+                    return;
+                }
+
+                select.innerHTML = '<option value="">-- Choose Live Game --</option>';
+                data.dates[0].games.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g.gamePk;
+                    opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`;
+                    select.appendChild(opt);
+                });
+                select.classList.remove('hidden');
+            } catch (e) {
+                console.error("MLB API Error:", e);
+            }
+        }
+
+        // 3. START GAME
         document.getElementById('go-btn').onclick = async () => {
-            if (roster.length === 0) return alert("Add players!");
+            if (roster.length < 1) return alert("Add at least one player to the lineup!");
+            
             selectedGamePk = document.getElementById('game-select').value;
             r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
             
-            const { error } = await sb.from('games').insert([{ id: r_id, players: roster, pot_total: roster.length, current_holder_index: 0 }]);
-            if (error) alert(error.message);
-            else {
+            const { error } = await sb.from('games').insert([{ 
+                id: r_id, 
+                players: roster, 
+                pot_total: roster.length, 
+                current_holder_index: 0,
+                last_event: "Game Started!" 
+            }]);
+
+            if (error) {
+                alert("Database Error: " + error.message);
+            } else {
                 document.getElementById('setup-area').classList.add('hidden');
                 document.getElementById('remote').classList.remove('hidden');
                 document.getElementById('up-now').innerText = roster[0].name;
+                scoreboardLink = window.location.origin + "/index.html?id=" + r_id;
+
                 if(selectedGamePk) {
                     document.getElementById('live-indicator').classList.remove('hidden');
-                    setInterval(checkMLB, 15000); // Check every 15s
+                    setInterval(checkMLB, 15000); // Check MLB every 15 seconds
                 }
             }
         };
 
-        // 3. MLB AUTO-SYNC ENGINE
+        function copyScoreboardLink(btn) {
+            navigator.clipboard.writeText(scoreboardLink).then(() => {
+                const old = btn.innerText;
+                btn.innerText = "LINK COPIED!";
+                setTimeout(() => btn.innerText = old, 2000);
+            });
+        }
+
+        // 4. MLB SYNC & MOVE LOGIC
         async function checkMLB() {
             if (!selectedGamePk) return;
             const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
             const data = await resp.json();
             const plays = data.allPlays;
-            const latestIndex = plays.length - 1;
+            if (!plays || plays.length === 0) return;
 
+            const latestIndex = plays.length - 1;
             if (latestIndex > lastProcessedPlayIndex) {
                 const play = plays[latestIndex];
                 if (play.about.isComplete) {
@@ -134,17 +183,17 @@
 
         function processPlay(event, desc) {
             if (event.includes('strikeout')) move('strikeout');
-            else if (event.includes('field_out') || event.includes('force_out')) move('out');
+            else if (event.includes('out')) move('out');
             else if (event.includes('single')) move('single');
             else if (event.includes('double')) move('double');
             else if (event.includes('triple')) move('triple');
             else if (event.includes('home_run')) move('hr');
         }
 
-        // 4. THE MOVE LOGIC
         async function move(type, btn) {
             if (btn) btn.style.opacity = "0.5";
             let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
+            
             let pot = parseFloat(g.pot_total);
             let list = g.players;
             let i = parseInt(g.current_holder_index);
@@ -156,11 +205,18 @@
             else if (type === 'double') { let pay = Math.min(pot, 2); pot -= pay; list[i].balance += pay; eventMsg = `${list[i].name} hit a Double! (-$2)`; }
             else if (type === 'triple') { let pay = Math.min(pot, 3); pot -= pay; list[i].balance += pay; eventMsg = `${list[i].name} hit a TRIPLE! (-$3)`; }
             else if (type === 'hr') { list[i].balance += pot; eventMsg = `${list[i].name} HOME RUN! POT CLEARED!`; pot = 0; }
+            else if (type === 'eject') { pot += 20; list[i].balance -= 20; eventMsg = `🚨 ${list[i].name} EJECTED! (+$20) 🚨`; }
 
             let next_i = (i + 1) % list.length;
             document.getElementById('up-now').innerText = list[next_i].name;
 
-            await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: eventMsg }).eq('id', r_id);
+            await sb.from('games').update({ 
+                pot_total: pot, 
+                players: list, 
+                current_holder_index: next_i, 
+                last_event: eventMsg 
+            }).eq('id', r_id);
+            
             if (btn) btn.style.opacity = "1";
         }
     </script>

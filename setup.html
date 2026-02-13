@@ -99,30 +99,31 @@
 
         // 2. MLB GAME FINDER
         async function findGames() {
-            try {
-                const today = new Date().toISOString().split('T')[0];
-                const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${today}`);
-                const data = await resp.json();
-                const select = document.getElementById('game-select');
-                
-                if (!data.dates || data.dates.length === 0) {
-                    alert("No games found for today.");
-                    return;
-                }
-
-                select.innerHTML = '<option value="">-- Choose Live Game --</option>';
-                data.dates[0].games.forEach(g => {
-                    const opt = document.createElement('option');
-                    opt.value = g.gamePk;
-                    opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`;
-                    select.appendChild(opt);
-                });
-                select.classList.remove('hidden');
-            } catch (e) {
-                console.error("MLB API Error:", e);
-            }
+    try {
+        // HARDCODED TEST DATE: July 10, 2025
+        const testDate = "2025-07-10"; 
+        const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${testDate}`);
+        const data = await resp.json();
+        const select = document.getElementById('game-select');
+        
+        if (!data.dates || data.dates.length === 0) {
+            alert("No games found for this test date.");
+            return;
         }
 
+        select.innerHTML = '<option value="">-- Choose 2025 Test Game --</option>';
+        data.dates[0].games.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.gamePk;
+            opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name} (Final)`;
+            select.appendChild(opt);
+        });
+        select.classList.remove('hidden');
+        console.log("Found games for test date:", testDate);
+    } catch (e) {
+        console.error("MLB API Error:", e);
+    }
+}
         // 3. START GAME
         document.getElementById('go-btn').onclick = async () => {
             if (roster.length < 1) return alert("Add at least one player to the lineup!");

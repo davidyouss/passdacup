@@ -9,7 +9,7 @@
 </head>
 <body class="bg-black text-white p-6 font-sans">
     <div class="max-w-md mx-auto space-y-6">
-        <h1 class="text-2xl font-black italic text-yellow-500 uppercase tracking-tighter text-center">Cup Manager</h1>
+        <h1 class="text-2xl font-black italic text-yellow-500 uppercase tracking-tighter text-center">Cup Manager Pro</h1>
 
         <div id="setup-area" class="space-y-4">
             <div class="space-y-2">
@@ -20,84 +20,130 @@
                 </div>
                 <div id="p-list" class="space-y-1 text-sm font-bold"></div>
             </div>
-            <button id="go-btn" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase">Start Game</button>
+
+            <div class="space-y-2">
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. Select MLB Game</p>
+                <button onclick="findGames()" class="w-full bg-gray-800 p-3 rounded-lg text-xs font-bold uppercase border border-gray-700">Find Today's Games</button>
+                <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500"></select>
+            </div>
+
+            <button id="go-btn" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg shadow-yellow-500/20">Start Game</button>
         </div>
 
         <div id="remote" class="hidden space-y-4 border-t-2 border-dashed border-gray-800 pt-6">
+            <div id="live-indicator" class="flex items-center justify-center gap-2 text-[10px] font-bold text-green-500 animate-pulse hidden">
+                <span class="w-2 h-2 bg-green-500 rounded-full"></span> LIVE MLB SYNC ACTIVE
+            </div>
+            
             <div class="bg-blue-600 p-4 rounded-xl shadow-lg text-center">
-                <p class="text-[9px] font-black uppercase text-blue-100 tracking-widest leading-none mb-1">Cup is with:</p>
+                <p class="text-[9px] font-black uppercase text-blue-100 mb-1">Cup is with:</p>
                 <h2 id="up-now" class="text-3xl font-black uppercase italic tracking-tighter">---</h2>
             </div>
 
             <div class="grid grid-cols-2 gap-2">
-                <button onclick="move('strikeout', this)" class="bg-red-900/40 border-2 border-red-600 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 italic underline">K Strikeout (+$2)</button>
-                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95">Fly/Ground Out (+$1)</button>
-                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95">1B (-$1)</button>
-                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95">2B (-$2)</button>
-                <button onclick="move('triple', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px] active:scale-95 text-yellow-500 underline">3B (-$3)</button>
-                <button onclick="move('hr', this)" class="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase text-[10px]">Home Run (CLEAR)</button>
-                <button onclick="move('eject', this)" class="bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px] col-span-2 mt-2">🚨 PLAYER EJECTED (+$20) 🚨</button>
+                <button onclick="move('strikeout', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">K (+$2)</button>
+                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">OUT (+$1)</button>
+                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">1B (-$1)</button>
+                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">2B (-$2)</button>
+                <button onclick="move('triple', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">3B (-$3)</button>
+                <button onclick="move('hr', this)" class="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase text-[10px]">HR (CLEAR)</button>
             </div>
-
-            <div class="pt-4 space-y-3">
-                <button id="copy-btn" onclick="copyScoreboardLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-xs uppercase">Copy Scoreboard Link</button>
-                <p id="room-display" class="text-center text-yellow-500 font-mono font-bold text-[10px] tracking-widest uppercase"></p>
+            
+            <div class="bg-gray-900 p-3 rounded-xl border border-gray-800 text-center">
+                <p class="text-[9px] text-gray-500 uppercase font-bold">Latest Play-by-Play</p>
+                <p id="pbp-text" class="text-[11px] italic text-gray-300">Waiting for first pitch...</p>
             </div>
         </div>
     </div>
 
     <script>
-        const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
-        const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
+        const S_URL = 'YOUR_SUPABASE_URL';
+        const S_KEY = 'YOUR_SUPABASE_KEY';
         const sb = supabase.createClient(S_URL, S_KEY);
 
         let roster = [];
         let r_id = "";
-        let scoreboardLink = "";
+        let selectedGamePk = null;
+        let lastProcessedPlayIndex = -1;
 
-        function genID() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
+        // 1. GAME FINDER LOGIC
+        async function findGames() {
+            const today = new Date().toISOString().split('T')[0];
+            const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${today}`);
+            const data = await resp.json();
+            const select = document.getElementById('game-select');
+            select.innerHTML = '<option value="">-- Choose Game --</option>';
+            
+            data.dates[0].games.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g.gamePk;
+                opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`;
+                select.appendChild(opt);
+            });
+            select.classList.remove('hidden');
+        }
 
+        // 2. SETUP LOGIC
         document.getElementById('add-btn').onclick = () => {
             const el = document.getElementById('p-input');
-            if (el.value.trim()) {
-                roster.push({ name: el.value.trim(), balance: 0 });
-                el.value = "";
-                draw();
-            }
+            if (el.value.trim()) { roster.push({ name: el.value.trim(), balance: 0 }); el.value = ""; draw(); }
         };
 
         function draw() {
             document.getElementById('p-list').innerHTML = roster.map((p, i) => 
-                `<div class="bg-gray-900 p-3 rounded-lg flex justify-between border border-gray-800 text-[11px] uppercase"><span>${i+1}. ${p.name}</span><button onclick="rem(${i})" class="text-red-500 font-black px-2">X</button></div>`
+                `<div class="bg-gray-900 p-3 rounded-lg flex justify-between border border-gray-800 text-[11px] uppercase"><span>${i+1}. ${p.name}</span></div>`
             ).join('');
         }
 
-        function rem(i) { roster.splice(i, 1); draw(); }
-
         document.getElementById('go-btn').onclick = async () => {
-            if (roster.length === 0) return alert("Add players first!");
-            r_id = genID();
+            if (roster.length === 0) return alert("Add players!");
+            selectedGamePk = document.getElementById('game-select').value;
+            r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
+            
             const { error } = await sb.from('games').insert([{ id: r_id, players: roster, pot_total: roster.length, current_holder_index: 0 }]);
             if (error) alert(error.message);
             else {
                 document.getElementById('setup-area').classList.add('hidden');
                 document.getElementById('remote').classList.remove('hidden');
                 document.getElementById('up-now').innerText = roster[0].name;
-                document.getElementById('room-display').innerText = "ROOM: " + r_id;
-                scoreboardLink = window.location.origin + "/index.html?id=" + r_id;
+                if(selectedGamePk) {
+                    document.getElementById('live-indicator').classList.remove('hidden');
+                    setInterval(checkMLB, 15000); // Check every 15s
+                }
             }
         };
 
-        function copyScoreboardLink(btn) {
-            navigator.clipboard.writeText(scoreboardLink).then(() => {
-                const old = btn.innerText;
-                btn.innerText = "LINK COPIED!";
-                setTimeout(() => btn.innerText = old, 2000);
-            });
+        // 3. MLB AUTO-SYNC ENGINE
+        async function checkMLB() {
+            if (!selectedGamePk) return;
+            const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
+            const data = await resp.json();
+            const plays = data.allPlays;
+            const latestIndex = plays.length - 1;
+
+            if (latestIndex > lastProcessedPlayIndex) {
+                const play = plays[latestIndex];
+                if (play.about.isComplete) {
+                    const desc = play.result.description;
+                    document.getElementById('pbp-text').innerText = desc;
+                    processPlay(play.result.event.toLowerCase(), desc);
+                    lastProcessedPlayIndex = latestIndex;
+                }
+            }
         }
 
+        function processPlay(event, desc) {
+            if (event.includes('strikeout')) move('strikeout');
+            else if (event.includes('field_out') || event.includes('force_out')) move('out');
+            else if (event.includes('single')) move('single');
+            else if (event.includes('double')) move('double');
+            else if (event.includes('triple')) move('triple');
+            else if (event.includes('home_run')) move('hr');
+        }
+
+        // 4. THE MOVE LOGIC
         async function move(type, btn) {
-            btn.style.opacity = "0.5";
+            if (btn) btn.style.opacity = "0.5";
             let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
             let pot = parseFloat(g.pot_total);
             let list = g.players;
@@ -105,18 +151,17 @@
             let eventMsg = "";
 
             if (type === 'strikeout') { pot += 2; list[i].balance -= 2; eventMsg = `${list[i].name} Struck Out! (+$2)`; }
-            else if (type === 'out') { pot += 1; list[i].balance -= 1; eventMsg = `${list[i].name} Grounded/Flyed Out (+$1)`; }
+            else if (type === 'out') { pot += 1; list[i].balance -= 1; eventMsg = `${list[i].name} Out (+$1)`; }
             else if (type === 'single') { let pay = Math.min(pot, 1); pot -= pay; list[i].balance += pay; eventMsg = `${list[i].name} hit a Single! (-$1)`; }
             else if (type === 'double') { let pay = Math.min(pot, 2); pot -= pay; list[i].balance += pay; eventMsg = `${list[i].name} hit a Double! (-$2)`; }
             else if (type === 'triple') { let pay = Math.min(pot, 3); pot -= pay; list[i].balance += pay; eventMsg = `${list[i].name} hit a TRIPLE! (-$3)`; }
-            else if (type === 'hr') { list[i].balance += pot; eventMsg = `${list[i].name} HIT A HOME RUN! POT CLEARED!`; pot = 0; }
-            else if (type === 'eject') { pot += 20; list[i].balance -= 20; eventMsg = `🚨 ${list[i].name} WAS EJECTED! (+$20) 🚨`; }
+            else if (type === 'hr') { list[i].balance += pot; eventMsg = `${list[i].name} HOME RUN! POT CLEARED!`; pot = 0; }
 
             let next_i = (i + 1) % list.length;
             document.getElementById('up-now').innerText = list[next_i].name;
 
             await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: eventMsg }).eq('id', r_id);
-            btn.style.opacity = "1";
+            if (btn) btn.style.opacity = "1";
         }
     </script>
 </body>

@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-black text-white p-6 font-sans">
-    <div class="max-w-md mx-auto space-y-6">
+    <div class="max-w-md mx-auto space-y-6 pb-20">
         <h1 class="text-2xl font-black italic text-yellow-500 uppercase tracking-tighter text-center">Cup Manager Pro</h1>
 
         <div id="setup-area" class="space-y-4">
@@ -32,8 +32,8 @@
             </div>
 
             <div class="space-y-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">3. Select MLB Game</p>
-                <button onclick="findGames()" class="w-full bg-gray-800 p-3 rounded-lg text-[10px] font-bold uppercase border border-gray-700">Find Games</button>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">3. Select MLB Game (Testing 2025)</p>
+                <button onclick="findGames(event)" class="w-full bg-gray-800 p-3 rounded-lg text-[10px] font-bold uppercase border border-gray-700">Find Games</button>
                 <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500"></select>
             </div>
 
@@ -62,12 +62,12 @@
             </div>
 
             <div class="bg-gray-900 p-3 rounded-xl border border-gray-800 text-center">
-                <p id="pbp-text" class="text-[11px] italic text-yellow-500 mb-2 font-bold">Waiting for play...</p>
-                <div id="play-history-list" class="space-y-1 text-left"></div>
+                <p id="pbp-text" class="text-[11px] italic text-yellow-500 mb-2 font-bold leading-tight">Waiting for play...</p>
+                <div id="play-history-list" class="space-y-1 text-left max-h-32 overflow-hidden opacity-50"></div>
             </div>
 
             <div id="settlement-area" class="mt-4 border-t-2 border-red-900 pt-6 hidden">
-                <h3 class="text-center text-red-500 font-black uppercase text-sm mb-4 italic">Final Settlement</h3>
+                <h3 class="text-center text-red-500 font-black uppercase text-sm mb-4 italic underline underline-offset-4 tracking-widest">Final Settlement</h3>
                 <div id="settlement-list" class="space-y-2"></div>
                 <button onclick="location.reload()" class="w-full bg-gray-800 text-gray-500 py-2 rounded-lg text-[9px] font-bold uppercase mt-4">Reset App</button>
             </div>
@@ -76,8 +76,8 @@
             <button id="copy-btn" onclick="copyScoreboardLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-[10px] uppercase">Copy Scoreboard Link</button>
         </div>
 
-        <div id="rejoin-area" class="bg-gray-900 border border-gray-800 p-4 rounded-xl space-y-2 mt-10">
-            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Resume Existing Session</p>
+        <div id="rejoin-area" class="bg-gray-900 border border-gray-800 p-4 rounded-xl space-y-2 mt-12">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Resume Session</p>
             <div class="flex gap-2">
                 <input id="rejoin-id" type="text" placeholder="CODE" class="flex-grow bg-black border border-gray-800 p-2 rounded text-center font-mono uppercase text-sm">
                 <button onclick="rejoinGame()" class="bg-gray-700 text-white px-4 rounded font-bold text-[10px] uppercase">Re-join</button>
@@ -129,17 +129,30 @@
             const startPot = bet * roster.length;
             const { error } = await sb.from('games').insert([{ id: r_id, players: roster, pot_total: startPot, current_holder_index: 0, last_event: "Play Ball!" }]);
             if (error) alert(error.message);
-            else { selectedGamePk = document.getElementById('game-select').value; switchToRemote(0); if(selectedGamePk) { document.getElementById('live-indicator').classList.remove('hidden'); setInterval(checkMLB, 15000); } }
+            else { 
+                selectedGamePk = document.getElementById('game-select').value; 
+                switchToRemote(0); 
+                if(selectedGamePk) { 
+                    document.getElementById('live-indicator').classList.remove('hidden'); 
+                    setInterval(checkMLB, 15000); 
+                } 
+            }
         };
 
-        async function findGames() {
-            const today = new Date().toISOString().split('T')[0];
-            const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${today}`);
-            const data = await resp.json();
-            const select = document.getElementById('game-select');
-            select.innerHTML = '<option value="">-- Select Game --</option>';
-            data.dates[0].games.forEach(g => { let opt = document.createElement('option'); opt.value = g.gamePk; opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; select.appendChild(opt); });
-            select.classList.remove('hidden');
+        async function findGames(e) {
+            const btn = e.target;
+            btn.innerText = "SEARCHING 2025...";
+            try {
+                const testDate = "2025-07-10"; 
+                const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${testDate}`);
+                const data = await resp.json();
+                const select = document.getElementById('game-select');
+                if (!data.dates || data.dates.length === 0) { btn.innerText = "NO GAMES FOUND"; return; }
+                select.innerHTML = '<option value="">-- Select 2025 Game --</option>';
+                data.dates[0].games.forEach(g => { let opt = document.createElement('option'); opt.value = g.gamePk; opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; select.appendChild(opt); });
+                select.classList.remove('hidden');
+                btn.classList.add('hidden');
+            } catch (err) { btn.innerText = "API ERROR"; }
         }
 
         async function checkMLB() {
@@ -171,7 +184,7 @@
         }
 
         async function move(type, btn) {
-            if (btn) btn.style.opacity = "0.5";
+            if (btn && btn.tagName === "BUTTON") btn.style.opacity = "0.5";
             let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
             let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index, msg = "";
             const unit = list[0].unit || 5;
@@ -185,11 +198,11 @@
             let next_i = (i + 1) % list.length;
             document.getElementById('up-now').innerText = list[next_i].name;
             await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: `${list[i].name}: ${msg}` }).eq('id', r_id);
-            if (btn) btn.style.opacity = "1";
+            if (btn && btn.tagName === "BUTTON") btn.style.opacity = "1";
         }
 
         async function runSettlement() {
-            if(!confirm("End game and calculate final debts?")) return;
+            if(!confirm("Game Over? Let's settle up.")) return;
             let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
             let givers = g.players.filter(p => p.balance < 0).map(p => ({ name: p.name, amt: Math.abs(parseFloat(p.balance)) }));
             let receivers = g.players.filter(p => p.balance > 0).map(p => ({ name: p.name, amt: parseFloat(p.balance) }));
@@ -203,10 +216,10 @@
                 if(givers[gi].amt < 0.01) gi++; if(receivers[ri].amt < 0.01) ri++;
             }
             document.getElementById('settlement-list').innerHTML = txs.map(t => `
-                <div class="bg-black p-4 rounded-xl border border-gray-800 text-center mb-2">
-                    <p class="text-[10px] font-bold uppercase"><span class="text-red-500">${t.from}</span> pays <span class="text-green-500">${t.to}</span></p>
+                <div class="bg-gray-900 p-4 rounded-xl border border-gray-800 text-center mb-2">
+                    <p class="text-[10px] font-bold uppercase text-gray-500 mb-1">${t.from} ➜ ${t.to}</p>
                     <p class="text-2xl font-black text-white">$${t.amt}</p>
-                    <a href="venmo://paycharge?txn=pay&recipients=${t.to}&amount=${t.amt}&note=PassTheCup" class="block bg-blue-600 text-[10px] py-2 mt-2 rounded font-black text-white uppercase">Open Venmo</a>
+                    <a href="venmo://paycharge?txn=pay&recipients=${t.to}&amount=${t.amt}&note=PassTheCup" class="block bg-blue-600 text-[10px] py-2 mt-2 rounded font-black text-white uppercase tracking-widest">Open Venmo</a>
                 </div>
             `).join('');
             document.getElementById('settlement-area').classList.remove('hidden');

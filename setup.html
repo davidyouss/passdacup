@@ -10,29 +10,39 @@
 <body class="bg-slate-950 text-white p-6 font-sans">
     <div class="max-w-md mx-auto space-y-8">
         <header class="text-center">
-            <h1 class="text-3xl font-black italic text-yellow-500 tracking-tighter uppercase underline decoration-blue-500">Start A Game</h1>
+            <h1 class="text-3xl font-black italic text-yellow-500 uppercase">Start A Game</h1>
         </header>
 
         <section class="space-y-4">
-            <h2 class="font-bold uppercase tracking-widest text-xs text-slate-400">1. Select Game</h2>
-            <select id="game-select" class="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-yellow-500">
-                <option value="748532">Yankees @ Red Sox (Spring Training)</option>
-                <option value="748533">Dodgers @ Padres (Spring Training)</option>
+            <h2 class="text-xs font-bold text-slate-400 uppercase">1. Select Game</h2>
+            <select id="game-select" class="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <option value="748532">Spring Training Game 1</option>
+                <option value="748533">Spring Training Game 2</option>
             </select>
         </section>
 
         <section class="space-y-4">
-            <h2 class="font-bold uppercase tracking-widest text-xs text-slate-400">2. Add Players (In Order)</h2>
+            <h2 class="text-xs font-bold text-slate-400 uppercase">2. Add Players</h2>
             <div class="flex space-x-2">
-                <input id="player-input" type="text" placeholder="Name" class="flex-grow bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none">
+                <input id="player-input" type="text" placeholder="Name" class="flex-grow bg-slate-900 border border-slate-800 p-4 rounded-xl">
                 <button onclick="addPlayer()" class="bg-blue-600 px-6 rounded-xl font-bold">+</button>
             </div>
             <ul id="lineup-list" class="space-y-2"></ul>
         </section>
 
-        <section class="space-y-4 pt-4 border-t border-slate-800">
-            <input id="room-id" type="text" placeholder="ROOM NAME (e.g. STADIUM)" class="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none uppercase font-black tracking-widest">
-            <button onclick="launchGame()" class="w-full bg-yellow-500 text-slate-950 font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest">Create Game Room</button>
+        <section class="space-y-4 border-t border-slate-800 pt-4">
+            <input id="room-id" type="text" placeholder="ROOM NAME" class="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl uppercase font-black">
+            <button onclick="launchGame()" class="w-full bg-yellow-500 text-slate-950 font-black py-5 rounded-2xl uppercase">Create Game Room</button>
+        </section>
+
+        <section id="manager-panel" class="hidden space-y-4 border-t border-yellow-500/30 pt-6">
+            <h2 class="text-center text-yellow-500 font-black italic uppercase">Manager Remote</h2>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="manualMove('out')" class="bg-red-900/40 border border-red-500 p-4 rounded-xl font-bold">OUT (+$1)</button>
+                <button onclick="manualMove('single')" class="bg-green-900/40 border border-green-500 p-4 rounded-xl font-bold">1B (-$1)</button>
+                <button onclick="manualMove('double')" class="bg-green-900/40 border border-green-500 p-4 rounded-xl font-bold">2B (-$2)</button>
+                <button onclick="manualMove('hr')" class="bg-yellow-500 text-black p-4 rounded-xl font-bold">HR (CLEAR)</button>
+            </div>
         </section>
     </div>
 
@@ -42,29 +52,44 @@
         const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let lineup = [];
+        let activeRoom = null;
 
         function addPlayer() {
             const input = document.getElementById('player-input');
-            const name = input.value.trim();
-            if (name) { lineup.push({ name: name, balance: 0 }); input.value = ''; renderLineup(); }
+            if (input.value) { lineup.push({ name: input.value, balance: 0 }); input.value = ''; renderLineup(); }
         }
 
         function renderLineup() {
-            const list = document.getElementById('lineup-list');
-            list.innerHTML = lineup.map((p, i) => `<li class="bg-slate-800/50 p-3 rounded-lg flex justify-between uppercase font-bold text-sm"><span>${i+1}. ${p.name}</span></li>`).join('');
+            document.getElementById('lineup-list').innerHTML = lineup.map((p, i) => `<li class="bg-slate-900 p-3 rounded-lg border border-slate-800">${i+1}. ${p.name}</li>`).join('');
         }
 
         async function launchGame() {
-            const roomId = document.getElementById('room-id').value.trim().toUpperCase();
-            const gameId = document.getElementById('game-select').value;
-            if (!roomId || lineup.length === 0) return alert("Missing info!");
-
+            activeRoom = document.getElementById('room-id').value.toUpperCase();
             const { error } = await supabase.from('games').insert([{ 
-                id: roomId, mlb_game_id: parseInt(gameId), players: lineup, pot_total: lineup.length, current_holder_index: 0, last_at_bat_index: -1 
+                id: activeRoom, mlb_game_id: 123, players: lineup, pot_total: lineup.length, current_holder_index: 0 
             }]);
+            if (!error) {
+                document.getElementById('manager-panel').classList.remove('hidden');
+                alert("Game Live! Share the link: " + window.location.origin + "/index.html?id=" + activeRoom);
+            }
+        }
 
-            if (error) alert(error.message);
-            else window.location.href = `index.html?id=${roomId}`;
+        async function manualMove(type) {
+            let { data: game } = await supabase.from('games').select('*').eq('id', activeRoom).single();
+            let pot = game.pot_total;
+            let players = game.players;
+            let idx = game.current_holder_index;
+
+            if (type === 'out') { pot += 1; players[idx].balance -= 1; }
+            else if (type === 'single') { let pay = Math.min(pot, 1); pot -= pay; players[idx].balance += pay; }
+            else if (type === 'double') { let pay = Math.min(pot, 2); pot -= pay; players[idx].balance += pay; }
+            else if (type === 'hr') { players[idx].balance += pot; pot = 0; }
+
+            await supabase.from('games').update({
+                pot_total: pot,
+                players: players,
+                current_holder_index: (idx + 1) % players.length
+            }).eq('id', activeRoom);
         }
     </script>
 </body>

@@ -15,7 +15,7 @@
             <div class="space-y-2">
                 <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. Add Lineup</p>
                 <div class="flex gap-2">
-                    <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold">
+                    <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold text-white">
                     <button id="add-btn" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
                 </div>
                 <div id="p-list" class="space-y-1 text-sm font-bold"></div>
@@ -24,21 +24,21 @@
         </div>
 
         <div id="remote" class="hidden space-y-6 border-t-2 border-dashed border-gray-800 pt-6">
-            <div class="bg-blue-600 p-4 rounded-xl shadow-lg text-center shadow-blue-900/20">
+            <div class="bg-blue-600 p-4 rounded-xl shadow-lg text-center">
                 <p class="text-[9px] font-black uppercase text-blue-100 tracking-widest">Currently Holding Cup</p>
                 <h2 id="up-now" class="text-3xl font-black uppercase italic tracking-tighter">---</h2>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-red-600 transition-all">OUT (+$1)</button>
-                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600 transition-all">1B (-$1)</button>
-                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600 transition-all">2B (-$2)</button>
-                <button onclick="move('hr', this)" class="bg-yellow-500 text-black p-5 rounded-xl font-black uppercase text-xs active:bg-white transition-all">Home Run</button>
+                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-red-600">OUT (+$1)</button>
+                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600">1B (-$1)</button>
+                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600">2B (-$2)</button>
+                <button onclick="move('hr', this)" class="bg-yellow-500 text-black p-5 rounded-xl font-black uppercase text-xs active:bg-white">Home Run</button>
             </div>
 
             <div class="pt-4 space-y-3">
-                <button onclick="shareGame()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 border border-slate-700">
-                    <span>Text Game Link to Friends</span>
+                <button id="share-btn" class="w-full bg-white text-black font-black py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+                    SHARE GAME LINK
                 </button>
                 <div class="text-center">
                     <p id="room-display" class="text-yellow-500 font-mono font-bold text-xs tracking-widest uppercase"></p>
@@ -94,23 +94,21 @@
             }
         };
 
-        // NEW: Share Functionality
-        async function shareGame() {
+        // THE SHARE BUTTON LOGIC
+        document.getElementById('share-btn').onclick = async () => {
             if (navigator.share) {
                 try {
                     await navigator.share({
                         title: 'Pass The Cup',
-                        text: `Join my Pass The Cup game! Room: ${r_id}`,
-                        url: finalLink,
+                        text: `Join the game! Room: ${r_id}`,
+                        url: finalLink
                     });
-                } catch (err) {
-                    console.log("Share cancelled or failed");
-                }
+                } catch (err) { console.log("Share skipped"); }
             } else {
-                // Fallback for browsers that don't support the share API
-                prompt("Copy this link to send to friends:", finalLink);
+                // Fallback for browsers that don't support native sharing
+                prompt("Copy and text this link to your friends:", finalLink);
             }
-        }
+        };
 
         async function move(type, btn) {
             btn.style.opacity = "0.5";

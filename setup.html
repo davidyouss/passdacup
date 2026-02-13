@@ -23,7 +23,7 @@
             <div class="space-y-2">
                 <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. Add Lineup</p>
                 <div class="flex gap-2">
-                    <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold">
+                    <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold text-white">
                     <button id="add-btn" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
                 </div>
                 <div id="p-list" class="space-y-2 mt-2"></div>
@@ -51,12 +51,12 @@
         <div id="remote" class="hidden space-y-4 border-t-2 border-dashed border-gray-800 pt-6">
             <div class="flex justify-between items-center text-[10px] font-bold">
                 <div id="live-indicator" class="text-green-500 animate-pulse hidden">● MLB AUTO-SYNC</div>
-                <div id="room-display" class="text-yellow-500 font-mono">CODE: ----</div>
+                <div id="room-display" class="text-yellow-500 font-mono text-sm">CODE: ----</div>
             </div>
             
-            <div class="bg-blue-600 p-4 rounded-xl text-center">
-                <p class="text-[9px] font-black uppercase text-blue-100">Cup is with:</p>
-                <h2 id="up-now" class="text-3xl font-black uppercase italic italic tracking-tighter">---</h2>
+            <div class="bg-blue-600 p-4 rounded-xl text-center shadow-lg">
+                <p class="text-[9px] font-black uppercase text-blue-100 mb-1">Cup is with:</p>
+                <h2 id="up-now" class="text-3xl font-black uppercase italic tracking-tighter text-white">---</h2>
             </div>
 
             <div class="grid grid-cols-2 gap-2">
@@ -70,12 +70,14 @@
             </div>
 
             <div class="bg-gray-900 p-3 rounded-xl border border-gray-800 text-center">
-                <p id="pbp-text" class="text-[11px] italic text-gray-400">Waiting for first play...</p>
+                <p class="text-[9px] text-gray-500 uppercase font-bold border-b border-gray-800 pb-1 mb-2">Live Feed History</p>
+                <p id="pbp-text" class="text-[11px] italic text-yellow-500 mb-2">Waiting for first play...</p>
+                <div id="play-history-list" class="space-y-1"></div>
             </div>
 
             <div id="settlement-area" class="mt-4 border-t-2 border-red-900 pt-6 hidden">
                 <h3 class="text-center text-red-500 font-black uppercase text-sm mb-4 italic">Final Settlement</h3>
-                <div id="settlement-list" class="space-y-2 mb-4"></div>
+                <div id="settlement-list" class="space-y-2 mb-4 text-white"></div>
                 <button onclick="location.reload()" class="w-full bg-gray-800 text-gray-400 py-2 rounded-lg text-[10px] font-bold uppercase">Reset App</button>
             </div>
 
@@ -89,11 +91,12 @@
         const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
 
-        let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, scoreboardLink = "";
+        let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, scoreboardLink = "", playHistory = [];
 
         // RE-JOIN
         async function rejoinGame() {
             const code = document.getElementById('rejoin-id').value.trim().toUpperCase();
+            if(!code) return;
             const { data, error } = await sb.from('games').select('*').eq('id', code).single();
             if (error) return alert("Game not found!");
             r_id = data.id; roster = data.players;
@@ -147,16 +150,18 @@
 
         // MLB LOGIC
         async function findGames() {
-            const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10`);
-            const data = await resp.json();
-            const select = document.getElementById('game-select');
-            select.innerHTML = '<option value="">-- Select Game --</option>';
-            data.dates[0].games.forEach(g => {
-                let opt = document.createElement('option'); opt.value = g.gamePk;
-                opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`;
-                select.appendChild(opt);
-            });
-            select.classList.remove('hidden');
+            try {
+                const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10`);
+                const data = await resp.json();
+                const select = document.getElementById('game-select');
+                select.innerHTML = '<option value="">-- Select Game --</option>';
+                data.dates[0].games.forEach(g => {
+                    let opt = document.createElement('option'); opt.value = g.gamePk;
+                    opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`;
+                    select.appendChild(opt);
+                });
+                select.classList.remove('hidden');
+            } catch (e) { alert("Error finding games."); }
         }
 
         async function checkMLB() {
@@ -167,14 +172,23 @@
             if (data.allPlays[nextIdx]) {
                 const play = data.allPlays[nextIdx];
                 if (play.result && play.result.description) {
-                    document.getElementById('pbp-text').innerText = play.result.description;
-                    processPlay(play.result.event.toLowerCase());
+                    const desc = play.result.description;
+                    document.getElementById('pbp-text').innerText = desc;
+                    processPlay(play.result.event.toLowerCase(), desc);
                     lastIdx = nextIdx;
                 }
             }
         }
 
-        function processPlay(ev) {
+        function processPlay(ev, desc) {
+            // Update History UI
+            playHistory.unshift(desc);
+            if (playHistory.length > 5) playHistory.pop();
+            document.getElementById('play-history-list').innerHTML = playHistory.map(p => 
+                `<p class="text-[9px] border-b border-gray-800 py-1 text-gray-500 italic">${p}</p>`
+            ).join('');
+
+            // Move Cup
             if (ev.includes('strikeout')) move('strikeout');
             else if (ev.includes('out')) move('out');
             else if (ev.includes('single')) move('single');
@@ -219,10 +233,10 @@
                 if(givers[gi].amt === 0) gi++; if(receivers[ri].amt === 0) ri++;
             }
             document.getElementById('settlement-list').innerHTML = txs.map(t => `
-                <div class="bg-black p-3 rounded border border-gray-800 text-center">
+                <div class="bg-black p-3 rounded border border-gray-800 text-center mb-2">
                     <p class="text-[10px] font-bold uppercase"><span class="text-red-500">${t.from}</span> ➜ <span class="text-green-500">${t.to}</span></p>
                     <p class="text-lg font-black">$${t.amt}</p>
-                    <a href="venmo://paycharge?txn=pay&recipients=${t.to}&amount=${t.amt}&note=PassTheCup" class="block bg-blue-600 text-[9px] py-1 mt-1 rounded font-black">VENMO</a>
+                    <a href="venmo://paycharge?txn=pay&recipients=${t.to}&amount=${t.amt}&note=PassTheCup" class="block bg-blue-600 text-[9px] py-1 mt-1 rounded font-black text-white">OPEN VENMO</a>
                 </div>
             `).join('');
             document.getElementById('settlement-area').classList.remove('hidden');

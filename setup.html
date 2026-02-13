@@ -15,7 +15,7 @@
             <div class="space-y-2">
                 <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. Add Lineup</p>
                 <div class="flex gap-2">
-                    <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold text-white">
+                    <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold">
                     <button id="add-btn" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
                 </div>
                 <div id="p-list" class="space-y-1 text-sm font-bold"></div>
@@ -30,18 +30,20 @@
             </div>
 
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-red-600">OUT (+$1)</button>
-                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600">1B (-$1)</button>
-                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600">2B (-$2)</button>
-                <button onclick="move('hr', this)" class="bg-yellow-500 text-black p-5 rounded-xl font-black uppercase text-xs active:bg-white">Home Run</button>
+                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-red-600 transition-all">OUT (+$1)</button>
+                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600 transition-all">1B (-$1)</button>
+                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 p-5 rounded-xl font-black uppercase text-xs active:bg-green-600 transition-all">2B (-$2)</button>
+                <button onclick="move('hr', this)" class="bg-yellow-500 text-black p-5 rounded-xl font-black uppercase text-xs active:bg-white transition-all">Home Run</button>
             </div>
 
-            <div class="pt-4 space-y-3">
-                <button id="share-btn" class="w-full bg-white text-black font-black py-3 rounded-xl text-sm flex items-center justify-center gap-2">
-                    SHARE GAME LINK
+            <div class="pt-4 space-y-4 bg-gray-900/50 p-4 rounded-2xl border border-gray-800">
+                <p class="text-[10px] text-center font-bold text-gray-500 uppercase tracking-widest">Invite Friends to Scoreboard</p>
+                <button onclick="copyLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-sm uppercase tracking-tight">
+                    Copy Link to Clipboard
                 </button>
                 <div class="text-center">
                     <p id="room-display" class="text-yellow-500 font-mono font-bold text-xs tracking-widest uppercase"></p>
+                    <p id="link-text" class="text-[10px] text-blue-400 break-all font-medium mt-2 opacity-70"></p>
                 </div>
             </div>
         </div>
@@ -89,26 +91,24 @@
                 document.getElementById('setup-area').classList.add('hidden');
                 document.getElementById('remote').classList.remove('hidden');
                 document.getElementById('up-now').innerText = roster[0].name;
-                document.getElementById('room-display').innerText = "ROOM CODE: " + r_id;
+                document.getElementById('room-display').innerText = "ROOM: " + r_id;
                 finalLink = window.location.origin + "/index.html?id=" + r_id;
+                document.getElementById('link-text').innerText = finalLink;
             }
         };
 
-        // THE SHARE BUTTON LOGIC
-        document.getElementById('share-btn').onclick = async () => {
-            if (navigator.share) {
-                try {
-                    await navigator.share({
-                        title: 'Pass The Cup',
-                        text: `Join the game! Room: ${r_id}`,
-                        url: finalLink
-                    });
-                } catch (err) { console.log("Share skipped"); }
-            } else {
-                // Fallback for browsers that don't support native sharing
-                prompt("Copy and text this link to your friends:", finalLink);
-            }
-        };
+        // NEW: Copy to Clipboard Function
+        function copyLink(btn) {
+            navigator.clipboard.writeText(finalLink).then(() => {
+                const originalText = btn.innerText;
+                btn.innerText = "COPIED!";
+                btn.classList.replace('bg-white', 'bg-green-500');
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.classList.replace('bg-green-500', 'bg-white');
+                }, 2000);
+            });
+        }
 
         async function move(type, btn) {
             btn.style.opacity = "0.5";

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup | Pass The Cup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 text-white p-6 font-sans">
+    <div class="max-w-md mx-auto space-y-8">
+        <header class="text-center">
+            <h1 class="text-3xl font-black italic text-yellow-500 tracking-tighter uppercase underline decoration-blue-500">Start A Game</h1>
+        </header>
+
+        <section class="space-y-4">
+            <h2 class="font-bold uppercase tracking-widest text-xs text-slate-400">1. Select Game</h2>
+            <select id="game-select" class="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-yellow-500">
+                <option value="748532">Yankees @ Red Sox (Spring Training)</option>
+                <option value="748533">Dodgers @ Padres (Spring Training)</option>
+            </select>
+        </section>
+
+        <section class="space-y-4">
+            <h2 class="font-bold uppercase tracking-widest text-xs text-slate-400">2. Add Players (In Order)</h2>
+            <div class="flex space-x-2">
+                <input id="player-input" type="text" placeholder="Name" class="flex-grow bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none">
+                <button onclick="addPlayer()" class="bg-blue-600 px-6 rounded-xl font-bold">+</button>
+            </div>
+            <ul id="lineup-list" class="space-y-2"></ul>
+        </section>
+
+        <section class="space-y-4 pt-4 border-t border-slate-800">
+            <input id="room-id" type="text" placeholder="ROOM NAME (e.g. STADIUM)" class="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl outline-none uppercase font-black tracking-widest">
+            <button onclick="launchGame()" class="w-full bg-yellow-500 text-slate-950 font-black py-5 rounded-2xl shadow-xl uppercase tracking-widest">Create Game Room</button>
+        </section>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let lineup = [];
+
+        function addPlayer() {
+            const input = document.getElementById('player-input');
+            const name = input.value.trim();
+            if (name) { lineup.push({ name: name, balance: 0 }); input.value = ''; renderLineup(); }
+        }
+
+        function renderLineup() {
+            const list = document.getElementById('lineup-list');
+            list.innerHTML = lineup.map((p, i) => `<li class="bg-slate-800/50 p-3 rounded-lg flex justify-between uppercase font-bold text-sm"><span>${i+1}. ${p.name}</span></li>`).join('');
+        }
+
+        async function launchGame() {
+            const roomId = document.getElementById('room-id').value.trim().toUpperCase();
+            const gameId = document.getElementById('game-select').value;
+            if (!roomId || lineup.length === 0) return alert("Missing info!");
+
+            const { error } = await supabase.from('games').insert([{ 
+                id: roomId, mlb_game_id: parseInt(gameId), players: lineup, pot_total: lineup.length, current_holder_index: 0, last_at_bat_index: -1 
+            }]);
+
+            if (error) alert(error.message);
+            else window.location.href = `index.html?id=${roomId}`;
+        }
+    </script>
+</body>
+</html>

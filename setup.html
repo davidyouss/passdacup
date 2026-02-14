@@ -12,36 +12,50 @@
         <h1 class="text-3xl font-black italic text-yellow-500 uppercase tracking-tighter text-center">Manager Pro</h1>
 
         <div id="setup-area" class="space-y-4">
-            <button onclick="findGames(event)" class="w-full bg-gray-800 p-3 rounded-lg text-[10px] font-bold uppercase border border-gray-700">Find 2025 Test Games</button>
-            
             <div class="space-y-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Add 5 Players</p>
-                <div id="p-list" class="space-y-2 mb-2"></div>
-                <button onclick="quickFill()" class="w-full bg-blue-600/20 text-blue-400 py-3 rounded-lg font-black uppercase text-xs border border-blue-400/30">⚡ Quick Fill 5 Players</button>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. Select Game (2025 Test Mode)</p>
+                <button onclick="findGames(event)" class="w-full bg-gray-800 p-3 rounded-lg text-[10px] font-bold uppercase border border-gray-700">Find 2025 Games</button>
+                <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500"></select>
             </div>
 
-            <button onclick="startGame()" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg shadow-yellow-500/20">Start Test Session</button>
+            <div class="space-y-2">
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. Lineup</p>
+                <div id="p-list" class="space-y-2 mb-2"></div>
+                <button onclick="quickFill()" class="w-full bg-blue-600/20 text-blue-400 py-3 rounded-lg font-black uppercase text-xs border border-blue-400/30 tracking-widest">⚡ Quick Fill 5 Players</button>
+            </div>
+
+            <button onclick="startGame()" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg">Start Live Session</button>
         </div>
 
-        <div id="remote" class="hidden space-y-4">
-            <div class="bg-blue-600 p-5 rounded-2xl text-center shadow-lg border-b-4 border-blue-800">
+        <div id="remote" class="hidden space-y-4 pt-4">
+            <div class="flex justify-between items-center text-[10px] font-bold">
+                <div id="live-indicator" class="text-green-500 animate-pulse hidden uppercase">● MLB Auto-Sync Active</div>
+                <div id="room-display" class="text-yellow-500 font-mono text-sm uppercase">CODE: ----</div>
+            </div>
+            
+            <div class="bg-blue-600 p-5 rounded-3xl text-center shadow-lg border-b-8 border-blue-800">
                 <p class="text-[10px] font-black uppercase text-blue-100 mb-1 tracking-widest">Cup is with:</p>
                 <h2 id="up-now" class="text-5xl font-black uppercase italic tracking-tighter">---</h2>
             </div>
 
-            <div class="grid grid-cols-2 gap-2">
-                <button onclick="move('strikeout', 'Test Strikeout (+$10)')" class="bg-red-900/40 border-2 border-red-900 py-4 rounded-xl font-black uppercase text-xs text-red-400">Add Debt (K)</button>
-                <button onclick="move('hr', 'TEST HOME RUN (Clears Pot)')" class="bg-green-900/40 border-2 border-green-900 py-4 rounded-xl font-black uppercase text-xs text-green-400">Add Winner (HR)</button>
+            <div class="bg-gray-900 p-4 rounded-2xl border border-gray-800 text-center">
+                <p id="pbp-text" class="text-[11px] italic text-yellow-500 font-bold leading-tight">Waiting for first play...</p>
+                <p id="last-sync" class="text-[8px] text-gray-600 uppercase mt-2 font-bold tracking-widest">Last MLB Check: --:--:--</p>
             </div>
 
-            <div id="settlement-area" class="mt-4 border-t-2 border-red-900 pt-6 hidden">
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="move('strikeout', 'Manual Strikeout')" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">Manual K</button>
+                <button onclick="move('hr', 'MANUAL HOME RUN!')" class="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase text-[10px]">Manual HR</button>
+            </div>
+
+            <div id="settlement-area" class="mt-4 border-t-2 border-red-900 pt-8 hidden">
                 <h3 class="text-center text-red-500 font-black uppercase text-sm mb-6 italic tracking-widest">Final Settlement</h3>
                 <div id="settlement-list" class="space-y-4"></div>
             </div>
 
-            <div id="manager-controls" class="space-y-2 pt-4">
-                <button id="end-btn" onclick="runSettlement()" class="w-full bg-red-600 text-white font-black py-5 rounded-2xl text-sm uppercase shadow-lg shadow-red-600/20">🏁 End Game & Settle Up</button>
-                <button onclick="location.reload()" class="w-full bg-gray-900 text-gray-500 font-bold py-3 rounded-xl text-[10px] uppercase">Reset Game</button>
+            <div id="manager-controls" class="space-y-2 pt-6">
+                <button id="end-btn" onclick="runSettlement()" class="w-full bg-red-600 text-white font-black py-5 rounded-2xl text-sm uppercase shadow-lg">🏁 End Game & Settle Up</button>
+                <button onclick="copyShareLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-[10px] uppercase">🔗 Share Scoreboard</button>
             </div>
         </div>
     </div>
@@ -50,7 +64,7 @@
         const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
-        let roster = [], r_id = "";
+        let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1;
 
         function quickFill() {
             const names = ["Alice", "Bob", "Charlie", "Dave", "Eve"];
@@ -59,42 +73,64 @@
         }
 
         function draw() {
-            document.getElementById('p-list').innerHTML = roster.map((p, i) => `<div class="bg-gray-900 p-3 rounded-lg flex justify-between font-bold text-sm border border-gray-800 uppercase"><span>${p.name}</span><button onclick="roster.splice(${i},1);draw()" class="text-red-500">X</button></div>`).join('');
+            document.getElementById('p-list').innerHTML = roster.map((p, i) => `<div class="bg-gray-900 p-2 rounded flex justify-between text-xs mb-1 font-bold"><span>${p.name}</span><button onclick="roster.splice(${i},1);draw()">X</button></div>`).join('');
+        }
+
+        async function findGames(e) {
+            const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10`);
+            const data = await resp.json();
+            const select = document.getElementById('game-select');
+            select.innerHTML = '<option value="">-- Select Game --</option>';
+            data.dates[0].games.forEach(g => { let opt = document.createElement('option'); opt.value = g.gamePk; opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; select.appendChild(opt); });
+            select.classList.remove('hidden'); e.target.classList.add('hidden');
         }
 
         async function startGame() {
-            if (roster.length < 2) return alert("Fill players first!");
+            if (roster.length < 2) return alert("Need 2+ players!");
             r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
             roster.forEach(p => { p.balance = -5; p.unit = 5; });
+            await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (5 * roster.length), current_holder_index: 0, last_event: "Play Ball!" }]);
+            selectedGamePk = document.getElementById('game-select').value;
+            document.getElementById('setup-area').classList.add('hidden');
+            document.getElementById('remote').classList.remove('hidden');
+            document.getElementById('room-display').innerText = `CODE: ${r_id}`;
+            document.getElementById('up-now').innerText = roster[0].name;
+            if(selectedGamePk) { document.getElementById('live-indicator').classList.remove('hidden'); setInterval(checkMLB, 15000); }
+        }
+
+        async function checkMLB() {
             try {
-                await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (5 * roster.length), current_holder_index: 0, last_event: "Test Started" }]);
-                document.getElementById('setup-area').classList.add('hidden');
-                document.getElementById('remote').classList.remove('hidden');
-                document.getElementById('up-now').innerText = roster[0].name;
-            } catch(e) { alert("Database error. Refresh."); }
+                const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
+                const data = await resp.json();
+                const nextIdx = lastIdx + 1;
+                document.getElementById('last-sync').innerText = `Last MLB Check: ${new Date().toLocaleTimeString()}`;
+                if (data.allPlays && data.allPlays[nextIdx]) {
+                    const desc = data.allPlays[nextIdx].result.description;
+                    document.getElementById('pbp-text').innerText = desc;
+                    move(data.allPlays[nextIdx].result.event.toLowerCase(), desc);
+                    lastIdx = nextIdx;
+                }
+            } catch(e) { console.log("Feed Delay..."); }
         }
 
         async function move(type, desc) {
-            let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
-            let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index;
-            if (type === 'strikeout') { pot += 10; list[i].balance -= 10; } 
-            else if (type === 'hr') { list[i].balance += pot; pot = 0; }
-            let next_i = (i + 1) % list.length;
-            document.getElementById('up-now').innerText = list[next_i].name;
-            await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: desc }).eq('id', r_id);
+            try {
+                let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
+                let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index, u = 5;
+                if (type.includes('strikeout')){ pot += (u*2); list[i].balance -= (u*2); }
+                else if (type.includes('out')){ pot += u; list[i].balance -= u; }
+                else if (type.includes('single')){ let a=Math.min(pot,u); pot-=a; list[i].balance+=a; }
+                else if (type.includes('hr')){ list[i].balance+=pot; pot=0; }
+                let next_i = (i + 1) % list.length;
+                document.getElementById('up-now').innerText = list[next_i].name;
+                await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: desc }).eq('id', r_id);
+            } catch(e) { console.log("DB Update Error"); }
         }
 
         async function runSettlement() {
             let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
             let givers = g.players.filter(p => p.balance < 0).map(p => ({ n: p.name, a: Math.abs(p.balance) }));
             let takers = g.players.filter(p => p.balance > 0).map(p => ({ n: p.name, a: p.balance }));
-            
-            if (takers.length === 0) {
-                document.getElementById('settlement-list').innerHTML = `<p class="text-center italic text-gray-500 text-xs">No winners yet.</p>`;
-                document.getElementById('settlement-area').classList.remove('hidden');
-                return;
-            }
-
             let txs = [], gi=0, ti=0;
             while(gi < givers.length && ti < takers.length) {
                 let pay = Math.min(givers[gi].a, takers[ti].a);
@@ -102,11 +138,9 @@
                 givers[gi].a -= pay; takers[ti].a -= pay;
                 if(givers[gi].a < 0.01) gi++; if(takers[ti].a < 0.01) ti++;
             }
-
-            let shareText = `🏆 PASS DA CUP DEBTS:\n` + txs.map(t => `• ${t.f} PAYS ${t.t}: $${t.a}`).join('\n');
-            
+            let shareText = `🏆 PASS DA CUP FINAL DEBTS:\n` + txs.map(t => `• ${t.f} PAYS ${t.t}: $${t.a}`).join('\n');
             document.getElementById('settlement-list').innerHTML = txs.map(t => `
-                <div class="bg-gray-900 p-5 rounded-3xl border-2 border-gray-800 flex flex-col items-center justify-center space-y-2 relative overflow-hidden">
+                <div class="bg-gray-900 p-5 rounded-3xl border-2 border-gray-800 flex flex-col items-center justify-center space-y-2">
                     <div class="flex justify-between w-full items-baseline">
                         <span class="text-red-500 font-black text-lg uppercase italic tracking-tighter">${t.f}</span>
                         <span class="text-white font-black text-3xl tabular-nums tracking-tighter">$${t.a}</span>
@@ -117,10 +151,7 @@
                         <span class="text-[10px] font-black uppercase tracking-[0.3em] text-white">PAYS</span>
                         <div class="h-[2px] flex-grow bg-gradient-to-r from-green-500 to-green-500/0"></div>
                     </div>
-                </div>
-            `).join('') + `
-            <button onclick="doCopy('${encodeURIComponent(shareText)}')" id="copy-btn" class="w-full bg-blue-600 py-5 rounded-2xl font-black uppercase text-xs mt-4 shadow-lg shadow-blue-600/30">📋 Copy for Group Chat</button>`;
-            
+                </div>`).join('') + `<button onclick="doCopy('${encodeURIComponent(shareText)}')" id="copy-btn" class="w-full bg-blue-600 py-5 rounded-2xl font-black uppercase text-xs mt-4">📋 Copy for Group Chat</button>`;
             document.getElementById('settlement-area').classList.remove('hidden');
             document.getElementById('manager-controls').classList.add('hidden');
         }
@@ -130,6 +161,10 @@
                 document.getElementById('copy-btn').innerText = "✅ COPIED!";
                 setTimeout(() => { document.getElementById('copy-btn').innerText = "📋 Copy for Group Chat"; }, 2000);
             });
+        }
+
+        function copyShareLink(btn) {
+            navigator.clipboard.writeText(window.location.origin + "/index.html?id=" + r_id).then(() => { btn.innerText = "COPIED!"; setTimeout(() => btn.innerText = "🔗 Share Scoreboard", 2000); });
         }
     </script>
 </body>

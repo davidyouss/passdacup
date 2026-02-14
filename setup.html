@@ -16,12 +16,13 @@
             <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500"></select>
 
             <div class="space-y-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Add 2+ Players to Test Settlement</p>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">5-Player Test Lineup</p>
                 <div class="flex gap-2">
                     <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold">
                     <button onclick="addPlayer()" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
                 </div>
                 <div id="p-list" class="space-y-2 mt-2"></div>
+                <button onclick="quickFill()" class="text-[10px] text-blue-400 font-bold uppercase underline">Quick Fill 5 Players</button>
             </div>
 
             <button onclick="startGame()" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase">Start Test Session</button>
@@ -44,7 +45,7 @@
             </div>
 
             <div id="manager-controls" class="space-y-2">
-                <button id="end-btn" onclick="runSettlement()" class="w-full bg-red-600 text-white font-black py-4 rounded-xl text-xs uppercase mt-2 shadow-lg shadow-red-600/20">🏁 End Game & Settle Up</button>
+                <button id="end-btn" onclick="runSettlement()" class="w-full bg-red-600 text-white font-black py-4 rounded-xl text-xs uppercase mt-2">🏁 End Game & Settle Up</button>
                 <button onclick="copyShareLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-[10px] uppercase">🔗 Share Scoreboard</button>
             </div>
         </div>
@@ -56,6 +57,12 @@
         const sb = supabase.createClient(S_URL, S_KEY);
         let roster = [], r_id = "", selectedGamePk = null;
 
+        function quickFill() {
+            const names = ["Player 1", "Player 2", "Player 3", "Player 4", "Player 5"];
+            roster = names.map(n => ({ name: n, balance: 0, unit: 5 }));
+            draw();
+        }
+
         function addPlayer() {
             const el = document.getElementById('p-input');
             if (el.value.trim()) { roster.push({ name: el.value.trim(), balance: 0, unit: 5 }); el.value = ""; draw(); }
@@ -66,72 +73,83 @@
         }
 
         async function findGames(e) {
-            const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10`);
-            const data = await resp.json();
-            const select = document.getElementById('game-select');
-            select.innerHTML = '<option value="775323">Dodgers @ Phillies (Test Game)</option>';
-            data.dates[0].games.forEach(g => { let opt = document.createElement('option'); opt.value = g.gamePk; opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; select.appendChild(opt); });
-            select.classList.remove('hidden'); e.target.classList.add('hidden');
+            try {
+                const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10`);
+                const data = await resp.json();
+                const select = document.getElementById('game-select');
+                select.innerHTML = '<option value="775323">Dodgers @ Phillies (Test Game)</option>';
+                data.dates[0].games.forEach(g => { 
+                    let opt = document.createElement('option'); opt.value = g.gamePk; opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; select.appendChild(opt); 
+                });
+                select.classList.remove('hidden'); e.target.classList.add('hidden');
+            } catch(e) { alert("MLB API Blocked. Use Manual Buttons."); }
         }
 
         async function startGame() {
-            if (roster.length < 2) return alert("Add at least 2 players to test settlement!");
+            if (roster.length < 2) return alert("Add players!");
             r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
             roster.forEach(p => { p.balance = -5; p.unit = 5; });
-            await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (5 * roster.length), current_holder_index: 0, last_event: "Test Started" }]);
-            document.getElementById('setup-area').classList.add('hidden');
-            document.getElementById('remote').classList.remove('hidden');
-            document.getElementById('up-now').innerText = roster[0].name;
+            try {
+                await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (5 * roster.length), current_holder_index: 0, last_event: "Test Started" }]);
+                document.getElementById('setup-area').classList.add('hidden');
+                document.getElementById('remote').classList.remove('hidden');
+                document.getElementById('up-now').innerText = roster[0].name;
+            } catch(e) { alert("Database Connection Failed."); }
         }
 
         async function move(type, desc) {
-            let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
-            let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index;
-            
-            if (type === 'strikeout') { pot += 10; list[i].balance -= 10; } 
-            else if (type === 'hr') { list[i].balance += pot; pot = 0; }
-
-            let next_i = (i + 1) % list.length;
-            document.getElementById('up-now').innerText = list[next_i].name;
-            await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: desc }).eq('id', r_id);
+            try {
+                let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
+                let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index;
+                if (type === 'strikeout') { pot += 10; list[i].balance -= 10; } 
+                else if (type === 'hr') { list[i].balance += pot; pot = 0; }
+                let next_i = (i + 1) % list.length;
+                document.getElementById('up-now').innerText = list[next_i].name;
+                await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: desc }).eq('id', r_id);
+            } catch(e) { alert("Action Failed - Check Internet"); }
         }
 
         async function runSettlement() {
-            let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
-            let givers = g.players.filter(p => p.balance < 0).map(p => ({ n: p.name, a: Math.abs(p.balance) }));
-            let takers = g.players.filter(p => p.balance > 0).map(p => ({ n: p.name, a: p.balance }));
-            
-            if (takers.length === 0) { 
-                document.getElementById('settlement-list').innerHTML = `<div class="p-4 bg-gray-900 rounded text-center text-xs italic">No winners yet. Everyone is currently even or in debt!</div>`;
+            try {
+                let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
+                let givers = g.players.filter(p => p.balance < 0).map(p => ({ n: p.name, a: Math.abs(p.balance) }));
+                let takers = g.players.filter(p => p.balance > 0).map(p => ({ n: p.name, a: p.balance }));
+                
+                if (takers.length === 0) { 
+                    document.getElementById('settlement-list').innerHTML = `<div class="p-4 bg-gray-900 rounded text-center text-xs italic">No winners. Everyone owes!</div>`;
+                    document.getElementById('settlement-area').classList.remove('hidden');
+                    return;
+                }
+
+                let txs = [], gi=0, ti=0;
+                while(gi < givers.length && ti < takers.length) {
+                    let pay = Math.min(givers[gi].a, takers[ti].a);
+                    if(pay > 0.01) txs.push({ f: givers[gi].n, t: takers[ti].n, a: pay.toFixed(2) });
+                    givers[gi].a -= pay; takers[ti].a -= pay;
+                    if(givers[gi].a < 0.01) gi++; if(takers[ti].a < 0.01) ti++;
+                }
+
+                let shareText = `🏆 FINAL DEBTS:\n` + txs.map(t => `• ${t.f} pays ${t.t}: $${t.a}`).join('\n');
+                
+                // UI FIX: "a pays b" explicitly shown in the row
+                document.getElementById('settlement-list').innerHTML = txs.map(t => `
+                    <div class="bg-gray-900 p-3 rounded-xl border border-gray-800 flex justify-between items-center mb-2">
+                        <div class="text-left"><span class="text-red-500 font-bold text-[10px] block uppercase">${t.f}</span><span class="text-[8px] text-gray-500 uppercase">Pays</span></div>
+                        <span class="text-xl font-black">$${t.a}</span>
+                        <div class="text-right"><span class="text-green-500 font-bold text-[10px] block uppercase">${t.t}</span><span class="text-[8px] text-gray-500 uppercase">To</span></div>
+                    </div>
+                `).join('') + `
+                <button onclick="doCopy('${encodeURIComponent(shareText)}')" id="copy-btn" class="w-full bg-blue-600 py-4 rounded-xl font-black uppercase text-[10px] mt-2">📋 Copy for Group Chat</button>`;
+                
                 document.getElementById('settlement-area').classList.remove('hidden');
-                return;
-            }
-
-            let txs = [], gi=0, ti=0;
-            while(gi < givers.length && ti < takers.length) {
-                let pay = Math.min(givers[gi].a, takers[ti].a);
-                if(pay > 0.01) txs.push({ f: givers[gi].n, t: takers[ti].n, a: pay.toFixed(2) });
-                givers[gi].a -= pay; takers[ti].a -= pay;
-                if(givers[gi].a < 0.01) gi++; if(takers[ti].a < 0.01) ti++;
-            }
-
-            let shareText = `🏆 PASS DA CUP FINAL DEBTS:\n` + txs.map(t => `• ${t.f} pays ${t.t}: $${t.a}`).join('\n');
-            document.getElementById('settlement-list').innerHTML = txs.map(t => `
-                <div class="bg-gray-900 p-3 rounded-xl border border-gray-800 flex justify-between items-center mb-2">
-                    <span class="text-red-500 font-bold text-[10px]">${t.f}</span>
-                    <span class="text-xl font-black">$${t.a}</span>
-                    <span class="text-green-500 font-bold text-[10px]">${t.t}</span>
-                </div>
-            `).join('') + `
-            <button onclick="doCopy('${encodeURIComponent(shareText)}')" id="copy-btn" class="w-full bg-blue-600 py-4 rounded-xl font-black uppercase text-[10px] mt-2">📋 Copy for Group Chat</button>`;
-            
-            document.getElementById('settlement-area').classList.remove('hidden');
-            document.getElementById('manager-controls').classList.add('hidden');
+                document.getElementById('manager-controls').classList.add('hidden');
+            } catch(e) { alert("Settlement Failed - Try Again"); }
         }
 
         function doCopy(txt) {
             navigator.clipboard.writeText(decodeURIComponent(txt)).then(() => {
                 document.getElementById('copy-btn').innerText = "✅ COPIED!";
+                setTimeout(() => { document.getElementById('copy-btn').innerText = "📋 Copy for Group Chat"; }, 2000);
             });
         }
 

@@ -177,9 +177,18 @@
                 else if (type==='eject'){ pot+=100; list[i].balance-=100; msg=`EJECTED (+$100)`; }
                 let next_i = (i + 1) % list.length;
                 document.getElementById('up-now').innerText = list[next_i].name;
+                // Ensure this line in move() includes the description
+                await sb.from('games').update({ 
+                    pot_total: pot, 
+                    players: list, 
+                    current_holder_index: next_i, 
+                    last_event: `${list[i].name}: ${msg}` // This shows up in your yellow ticker
+                }).eq('id', r_id);
                 await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: `${list[i].name}: ${msg}` }).eq('id', r_id);
             } catch(e) { console.log("Move Error"); }
         }
+
+        // Ensure this line in move() includes the description
 
         function copyShareLink(btn) {
             const link = window.location.origin + "/index.html?id=" + r_id;

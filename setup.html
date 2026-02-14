@@ -3,84 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manager | Pass The Cup</title>
+    <title>Manager | Pass Da Cup</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-black text-white p-6 font-sans">
     <div class="max-w-md mx-auto space-y-6 pb-20">
-        <h1 class="text-2xl font-black italic text-yellow-500 uppercase tracking-tighter text-center">Cup Manager Pro</h1>
+        <h1 class="text-3xl font-black italic text-yellow-500 uppercase tracking-tighter text-center">Manager Pro</h1>
 
         <div id="setup-area" class="space-y-4">
             <div class="space-y-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. Add Lineup</p>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">1. Select Game (2025 Test Mode)</p>
+                <button onclick="findGames(event)" class="w-full bg-gray-800 p-3 rounded-lg text-[10px] font-bold uppercase border border-gray-700">Find 2025 Games</button>
+                <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500"></select>
+            </div>
+
+            <div class="space-y-2">
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. Add Lineup</p>
                 <div class="flex gap-2">
                     <input id="p-input" type="text" placeholder="Name" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg outline-none font-bold text-white">
-                    <button id="add-btn" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
+                    <button onclick="addPlayer()" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
                 </div>
                 <div id="p-list" class="space-y-2 mt-2"></div>
             </div>
 
             <div class="space-y-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">2. Set Base Bet (Unit)</p>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">3. Set Base Bet</p>
                 <select id="base-bet" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg font-bold text-green-500">
                     <option value="1">$1.00</option>
-                    <option value="2">$2.00</option>
                     <option value="5" selected>$5.00</option>
                     <option value="10">$10.00</option>
                 </select>
             </div>
 
-            <div class="space-y-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">3. Select MLB Game (Testing 2025)</p>
-                <button onclick="findGames(event)" class="w-full bg-gray-800 p-3 rounded-lg text-[10px] font-bold uppercase border border-gray-700">Find Games</button>
-                <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500"></select>
-            </div>
-
-            <button id="go-btn" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg shadow-yellow-500/20">Start New Game</button>
+            <button onclick="startGame()" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg shadow-yellow-500/20">Start New Session</button>
         </div>
 
         <div id="remote" class="hidden space-y-4 pt-4">
             <div class="flex justify-between items-center text-[10px] font-bold">
-                <div id="live-indicator" class="text-green-500 animate-pulse hidden">● MLB AUTO-SYNC</div>
-                <div id="room-display" class="text-yellow-500 font-mono text-sm uppercase">CODE: ----</div>
+                <div id="live-indicator" class="text-green-500 animate-pulse hidden">● MLB LIVE SYNC</div>
+                <div id="room-display" class="text-yellow-500 font-mono text-sm uppercase tracking-widest">CODE: ----</div>
             </div>
             
-            <div class="bg-blue-600 p-4 rounded-xl text-center shadow-lg">
-                <p class="text-[9px] font-black uppercase text-blue-100 mb-1">Cup is with:</p>
+            <div class="bg-blue-600 p-5 rounded-2xl text-center shadow-lg">
+                <p class="text-[10px] font-black uppercase text-blue-100 mb-1">Cup is with:</p>
                 <h2 id="up-now" class="text-4xl font-black uppercase italic tracking-tighter text-white">---</h2>
             </div>
 
             <div class="grid grid-cols-2 gap-2">
-                <button onclick="move('strikeout', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">K (Base x2)</button>
-                <button onclick="move('out', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">OUT (Base x1)</button>
-                <button onclick="move('single', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">1B (-Base)</button>
-                <button onclick="move('double', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">2B (-Base x2)</button>
-                <button onclick="move('triple', this)" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">3B (-Base x3)</button>
-                <button onclick="move('hr', this)" class="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase text-[10px]">HR (CLEAR)</button>
-                <button onclick="move('eject', this)" class="bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px] col-span-2">🚨 PLAYER EJECTED (+$100) 🚨</button>
+                <button onclick="move('strikeout')" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">K (Base x2)</button>
+                <button onclick="move('out')" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">OUT (Base x1)</button>
+                <button onclick="move('single')" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">1B (-Base)</button>
+                <button onclick="move('double')" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">2B (-Base x2)</button>
+                <button onclick="move('triple')" class="bg-gray-900 border-2 border-gray-800 py-4 rounded-xl font-black uppercase text-[10px]">3B (-Base x3)</button>
+                <button onclick="move('hr')" class="bg-yellow-500 text-black py-4 rounded-xl font-black uppercase text-[10px]">HR (CLEAR)</button>
+                <button onclick="move('eject')" class="bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px] col-span-2 tracking-widest">🚨 PLAYER EJECTED (+$100) 🚨</button>
             </div>
 
             <div class="bg-gray-900 p-3 rounded-xl border border-gray-800 text-center">
-                <p id="pbp-text" class="text-[11px] italic text-yellow-500 mb-2 font-bold leading-tight">Waiting for play...</p>
-                <div id="play-history-list" class="space-y-1 text-left max-h-32 overflow-hidden opacity-50"></div>
+                <p id="pbp-text" class="text-[11px] italic text-yellow-500 mb-2 font-bold leading-tight">Waiting for first play...</p>
+                <div id="play-history-list" class="space-y-1 text-left opacity-40"></div>
             </div>
 
             <div id="settlement-area" class="mt-4 border-t-2 border-red-900 pt-6 hidden">
-                <h3 class="text-center text-red-500 font-black uppercase text-sm mb-4 italic underline underline-offset-4 tracking-widest">Final Settlement</h3>
+                <h3 class="text-center text-red-500 font-black uppercase text-sm mb-4 italic tracking-widest">Final Settlement</h3>
                 <div id="settlement-list" class="space-y-2"></div>
-                <button onclick="location.reload()" class="w-full bg-gray-800 text-gray-500 py-2 rounded-lg text-[9px] font-bold uppercase mt-4">Reset App</button>
+                <button onclick="location.reload()" class="w-full bg-gray-800 text-gray-500 py-2 rounded-lg text-[9px] font-bold uppercase mt-6">Reset Session</button>
             </div>
 
-            <button id="end-game-btn" onclick="runSettlement()" class="w-full bg-red-600/10 text-red-500 border border-red-600/40 font-black py-4 rounded-xl text-xs uppercase mt-2">🏁 End Game & Settle Up</button>
-            <button id="copy-btn" onclick="copyScoreboardLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-[10px] uppercase">Copy Scoreboard Link</button>
+            <button id="end-btn" onclick="runSettlement()" class="w-full bg-red-600/10 text-red-500 border border-red-600/40 font-black py-4 rounded-xl text-xs uppercase mt-2">🏁 End Game & Settle Up</button>
         </div>
 
         <div id="rejoin-area" class="bg-gray-900 border border-gray-800 p-4 rounded-xl space-y-2 mt-12">
-            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Resume Session</p>
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Resume Existing Session</p>
             <div class="flex gap-2">
                 <input id="rejoin-id" type="text" placeholder="CODE" class="flex-grow bg-black border border-gray-800 p-2 rounded text-center font-mono uppercase text-sm">
-                <button onclick="rejoinGame()" class="bg-gray-700 text-white px-4 rounded font-bold text-[10px] uppercase">Re-join</button>
+                <button onclick="rejoinGame()" class="bg-gray-700 text-white px-4 rounded font-bold text-[10px] uppercase">Join</button>
             </div>
         </div>
     </div>
@@ -90,30 +88,12 @@
         const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
 
-        let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, scoreboardLink = "", playHistory = [];
+        let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, playHistory = [];
 
-        async function rejoinGame() {
-            const code = document.getElementById('rejoin-id').value.trim().toUpperCase();
-            if(!code) return;
-            const { data, error } = await sb.from('games').select('*').eq('id', code).single();
-            if (error) return alert("Game not found!");
-            r_id = data.id; roster = data.players;
-            switchToRemote(data.current_holder_index);
-        }
-
-        function switchToRemote(idx) {
-            document.getElementById('setup-area').classList.add('hidden');
-            document.getElementById('rejoin-area').classList.add('hidden');
-            document.getElementById('remote').classList.remove('hidden');
-            document.getElementById('room-display').innerText = `CODE: ${r_id}`;
-            document.getElementById('up-now').innerText = roster[idx].name;
-            scoreboardLink = window.location.origin + "/index.html?id=" + r_id;
-        }
-
-        document.getElementById('add-btn').onclick = () => {
+        function addPlayer() {
             const el = document.getElementById('p-input');
             if (el.value.trim()) { roster.push({ name: el.value.trim(), balance: 0 }); el.value = ""; draw(); }
-        };
+        }
 
         function draw() {
             document.getElementById('p-list').innerHTML = roster.map((p, i) => 
@@ -121,27 +101,8 @@
             ).join('');
         }
 
-        document.getElementById('go-btn').onclick = async () => {
-            if (roster.length === 0) return alert("Add players!");
-            const bet = parseFloat(document.getElementById('base-bet').value);
-            r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
-            roster.forEach(p => { p.balance = -bet; p.unit = bet; });
-            const startPot = bet * roster.length;
-            const { error } = await sb.from('games').insert([{ id: r_id, players: roster, pot_total: startPot, current_holder_index: 0, last_event: "Play Ball!" }]);
-            if (error) alert(error.message);
-            else { 
-                selectedGamePk = document.getElementById('game-select').value; 
-                switchToRemote(0); 
-                if(selectedGamePk) { 
-                    document.getElementById('live-indicator').classList.remove('hidden'); 
-                    setInterval(checkMLB, 15000); 
-                } 
-            }
-        };
-
         async function findGames(e) {
-            const btn = e.target;
-            btn.innerText = "SEARCHING 2025...";
+            const btn = e.target; btn.innerText = "SEARCHING...";
             try {
                 const testDate = "2025-07-10"; 
                 const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${testDate}`);
@@ -150,31 +111,47 @@
                 if (!data.dates || data.dates.length === 0) { btn.innerText = "NO GAMES FOUND"; return; }
                 select.innerHTML = '<option value="">-- Select 2025 Game --</option>';
                 data.dates[0].games.forEach(g => { let opt = document.createElement('option'); opt.value = g.gamePk; opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; select.appendChild(opt); });
-                select.classList.remove('hidden');
-                btn.classList.add('hidden');
+                select.classList.remove('hidden'); btn.classList.add('hidden');
             } catch (err) { btn.innerText = "API ERROR"; }
         }
 
+        async function startGame() {
+            if (roster.length === 0) return alert("Add players first!");
+            const bet = parseFloat(document.getElementById('base-bet').value);
+            r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
+            roster.forEach(p => { p.balance = -bet; p.unit = bet; });
+            const { error } = await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (bet * roster.length), current_holder_index: 0, last_event: "Play Ball!" }]);
+            if (error) return alert("Supabase Error");
+            selectedGamePk = document.getElementById('game-select').value;
+            switchToRemote(0);
+            if(selectedGamePk) { document.getElementById('live-indicator').classList.remove('hidden'); setInterval(checkMLB, 15000); }
+        }
+
+        function switchToRemote(idx) {
+            document.getElementById('setup-area').classList.add('hidden');
+            document.getElementById('rejoin-area').classList.add('hidden');
+            document.getElementById('remote').classList.remove('hidden');
+            document.getElementById('room-display').innerText = `CODE: ${r_id}`;
+            document.getElementById('up-now').innerText = roster[idx].name;
+        }
+
         async function checkMLB() {
-            if (!selectedGamePk) return;
-            const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
-            const data = await resp.json();
-            const nextIdx = lastIdx + 1;
-            if (data.allPlays && data.allPlays[nextIdx]) {
-                const play = data.allPlays[nextIdx];
-                if (play.result && play.result.description) {
-                    const desc = play.result.description;
+            try {
+                const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
+                const data = await resp.json();
+                const nextIdx = lastIdx + 1;
+                if (data.allPlays && data.allPlays[nextIdx]) {
+                    const desc = data.allPlays[nextIdx].result.description;
                     document.getElementById('pbp-text').innerText = desc;
-                    processPlay(play.result.event.toLowerCase(), desc);
+                    processPlay(data.allPlays[nextIdx].result.event.toLowerCase(), desc);
                     lastIdx = nextIdx;
                 }
-            }
+            } catch (e) { console.log("MLB Sync Issue"); }
         }
 
         function processPlay(ev, desc) {
-            playHistory.unshift(desc);
-            if (playHistory.length > 5) playHistory.pop();
-            document.getElementById('play-history-list').innerHTML = playHistory.map(p => `<p class="text-[9px] border-b border-gray-800 py-1 text-gray-500 italic leading-tight">${p}</p>`).join('');
+            playHistory.unshift(desc); if (playHistory.length > 5) playHistory.pop();
+            document.getElementById('play-history-list').innerHTML = playHistory.map(p => `<p class="text-[9px] border-b border-gray-800 py-1 italic leading-tight">${p}</p>`).join('');
             if (ev.includes('strikeout')) move('strikeout');
             else if (ev.includes('out')) move('out');
             else if (ev.includes('single')) move('single');
@@ -183,51 +160,65 @@
             else if (ev.includes('home_run')) move('hr');
         }
 
-        async function move(type, btn) {
-            if (btn && btn.tagName === "BUTTON") btn.style.opacity = "0.5";
+        async function move(type) {
             let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
-            let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index, msg = "";
-            const unit = list[0].unit || 5;
-            if (type==='strikeout'){ let a=unit*2; pot+=a; list[i].balance-=a; msg=`K (+$${a})`; }
-            else if (type==='out'){ let a=unit; pot+=a; list[i].balance-=a; msg=`Out (+$${a})`; }
-            else if (type==='single'){ let a=Math.min(pot,unit); pot-=a; list[i].balance+=a; msg=`1B (-$${a})`; }
-            else if (type==='double'){ let a=Math.min(pot,unit*2); pot-=a; list[i].balance+=a; msg=`2B (-$${a})`; }
-            else if (type==='triple'){ let a=Math.min(pot,unit*3); pot-=a; list[i].balance+=a; msg=`3B (-$${a})`; }
+            if(!g) return;
+            let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index, msg = "", u = list[0].unit;
+            if (type==='strikeout'){ let a=u*2; pot+=a; list[i].balance-=a; msg=`K (+$${a})`; }
+            else if (type==='out'){ pot+=u; list[i].balance-=u; msg=`Out (+$${u})`; }
+            else if (type==='single'){ let a=Math.min(pot,u); pot-=a; list[i].balance+=a; msg=`1B (-$${a})`; }
+            else if (type==='double'){ let a=Math.min(pot,u*2); pot-=a; list[i].balance+=a; msg=`2B (-$${a})`; }
+            else if (type==='triple'){ let a=Math.min(pot,u*3); pot-=a; list[i].balance+=a; msg=`3B (-$${a})`; }
             else if (type==='hr'){ list[i].balance+=pot; msg=`HR (+$${pot.toFixed(2)})`; pot=0; }
             else if (type==='eject'){ pot+=100; list[i].balance-=100; msg=`EJECTED (+$100)`; }
             let next_i = (i + 1) % list.length;
             document.getElementById('up-now').innerText = list[next_i].name;
             await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: `${list[i].name}: ${msg}` }).eq('id', r_id);
-            if (btn && btn.tagName === "BUTTON") btn.style.opacity = "1";
         }
 
         async function runSettlement() {
-            if(!confirm("Game Over? Let's settle up.")) return;
+            if(!confirm("Ready to show who owes what?")) return;
             let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
-            let givers = g.players.filter(p => p.balance < 0).map(p => ({ name: p.name, amt: Math.abs(parseFloat(p.balance)) }));
-            let receivers = g.players.filter(p => p.balance > 0).map(p => ({ name: p.name, amt: parseFloat(p.balance) }));
+            let givers = g.players.filter(p => p.balance < 0).map(p => ({ n: p.name, a: Math.abs(p.balance) }));
+            let takers = g.players.filter(p => p.balance > 0).map(p => ({ n: p.name, a: p.balance }));
             let txs = [];
-            givers.sort((a,b) => b.amt - a.amt); receivers.sort((a,b) => b.amt - a.amt);
-            let gi=0, ri=0;
-            while(gi < givers.length && ri < receivers.length) {
-                let pay = Math.min(givers[gi].amt, receivers[ri].amt);
-                if(pay > 0.01) txs.push({ from: givers[gi].name, to: receivers[ri].name, amt: pay.toFixed(2) });
-                givers[gi].amt -= pay; receivers[ri].amt -= pay;
-                if(givers[gi].amt < 0.01) gi++; if(receivers[ri].amt < 0.01) ri++;
+            givers.sort((a,b) => b.a - a.a); takers.sort((a,b) => b.a - a.a);
+            let gi=0, ti=0;
+            while(gi < givers.length && ti < takers.length) {
+                let pay = Math.min(givers[gi].a, takers[ti].a);
+                if(pay > 0.01) txs.push({ f: givers[gi].n, t: takers[ti].n, a: pay.toFixed(2) });
+                givers[gi].a -= pay; takers[ti].a -= pay;
+                if(givers[gi].a < 0.01) gi++; if(takers[ti].a < 0.01) ti++;
             }
-            document.getElementById('settlement-list').innerHTML = txs.map(t => `
-                <div class="bg-gray-900 p-4 rounded-xl border border-gray-800 text-center mb-2">
-                    <p class="text-[10px] font-bold uppercase text-gray-500 mb-1">${t.from} ➜ ${t.to}</p>
-                    <p class="text-2xl font-black text-white">$${t.amt}</p>
-                    <a href="venmo://paycharge?txn=pay&recipients=${t.to}&amount=${t.amt}&note=PassTheCup" class="block bg-blue-600 text-[10px] py-2 mt-2 rounded font-black text-white uppercase tracking-widest">Open Venmo</a>
-                </div>
-            `).join('');
+            let shareText = `🏆 PASS DA CUP FINAL DEBTS:\n`;
+            txs.forEach(t => { shareText += `• ${t.f} pays ${t.t}: $${t.a}\n`; });
+            document.getElementById('settlement-list').innerHTML = `
+                <div class="space-y-2">
+                    ${txs.map(t => `
+                        <div class="bg-gray-900 p-3 rounded-lg border border-gray-800 flex justify-between items-center">
+                            <span class="text-[10px] font-bold uppercase text-red-500">${t.f}</span>
+                            <span class="text-xl font-black text-white">$${t.a}</span>
+                            <span class="text-[10px] font-bold uppercase text-green-500">${t.t}</span>
+                        </div>
+                    `).join('')}
+                    <button onclick="copyToClipboard('${btoa(shareText)}')" id="copy-settle-btn" class="w-full bg-blue-600 py-4 rounded-xl text-[10px] font-black uppercase mt-4">📋 Copy Results for Group Chat</button>
+                </div>`;
             document.getElementById('settlement-area').classList.remove('hidden');
-            document.getElementById('end-game-btn').classList.add('hidden');
+            document.getElementById('end-btn').classList.add('hidden');
         }
 
-        function copyScoreboardLink(btn) {
-            navigator.clipboard.writeText(scoreboardLink).then(() => { btn.innerText = "COPIED!"; setTimeout(() => btn.innerText = "Copy Scoreboard Link", 2000); });
+        function copyToClipboard(encodedStr) {
+            navigator.clipboard.writeText(atob(encodedStr)).then(() => {
+                const b = document.getElementById('copy-settle-btn'); b.innerText = "✅ COPIED!";
+                setTimeout(() => b.innerText = "📋 Copy Results for Group Chat", 2000);
+            });
+        }
+
+        async function rejoinGame() {
+            const code = document.getElementById('rejoin-id').value.trim().toUpperCase();
+            const { data } = await sb.from('games').select('*').eq('id', code).single();
+            if(data) { r_id = data.id; roster = data.players; switchToRemote(data.current_holder_index); }
+            else { alert("Code not found."); }
         }
     </script>
 </body>

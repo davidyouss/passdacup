@@ -18,37 +18,39 @@ function addPlayer() {
 // 2. DRAW INITIAL LINEUP LIST (PRE-GAME)
 function draw() {
     document.getElementById('p-list').innerHTML = roster.map((p, i) => `
-        <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800">
+        <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center">
             <span>${p.name}</span>
-            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 px-2">X</button>
+            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-black px-2">X</button>
         </div>
     `).join('');
 }
 
 // 3. FETCH HISTORICAL MLB GAMES
 async function findGames(e) {
-    const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10`);
-    const data = await resp.json();
-    const select = document.getElementById('game-select');
-    select.innerHTML = '<option value="">-- SELECT GAME --</option>';
-    data.dates[0].games.forEach(g => {
-        let opt = document.createElement('option');
-        opt.value = g.gamePk;
-        opt.text = `${g.teams.away.team.name.toUpperCase()} @ ${g.teams.home.team.name.toUpperCase()}`;
-        select.appendChild(opt);
-    });
-    select.classList.remove('hidden');
-    e.target.classList.add('hidden');
+    try {
+        const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
+        const data = await resp.json();
+        const select = document.getElementById('game-select');
+        select.innerHTML = '<option value="">-- SELECT GAME --</option>';
+        data.dates[0].games.forEach(g => {
+            let opt = document.createElement('option');
+            opt.value = g.gamePk;
+            opt.text = `${g.teams.away.team.name.toUpperCase()} @ ${g.teams.home.team.name.toUpperCase()}`;
+            select.appendChild(opt);
+        });
+        select.classList.remove('hidden');
+        e.target.classList.add('hidden');
+    } catch (err) { console.error("Game fetch failed", err); }
 }
 
 // 4. INITIALIZE SESSION
 async function startGame() {
     if (roster.length < 2) return alert("ADD 2+ PLAYERS!");
-    
     const sel = document.getElementById('game-select');
+    if (!sel.value) return alert("SELECT A GAME FIRST!");
+
     gameName = sel.options[sel.selectedIndex].text;
     const unit = parseFloat(document.getElementById('base-bet').value);
-    
     r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
     
     // Set initial buy-in debt
@@ -60,6 +62,7 @@ async function startGame() {
     
     updateManagerUI(roster, 0);
 
+    // Initial Database Push
     await sb.from('games').insert([{ 
         id: r_id, 
         players: roster, 
@@ -70,7 +73,7 @@ async function startGame() {
     }]);
 
     selectedGamePk = sel.value;
-    if (selectedGamePk) setInterval(checkMLB, 15000);
+    setInterval(checkMLB, 15000); // Poll every 15s
 }
 
 // 5. POLL MLB FEED (HISTORICAL REPLAY)
@@ -86,12 +89,11 @@ async function checkMLB() {
             document.getElementById('pbp-text').innerText = play.result.description;
             document.getElementById('replay-status').innerText = `PLAY #${nextIdx + 1} OF ${data.allPlays.length}`;
             
+            // Trigger the math logic
             await processMove(play.result.event.toLowerCase(), play.result.description);
             lastIdx = nextIdx;
         }
-    } catch (e) {
-        console.error("FEED ERROR:", e);
-    }
+    } catch (e) { console.error("FEED ERROR:", e); }
 }
 
 // 6. PROCESS MATH & UPDATE DB
@@ -125,7 +127,7 @@ async function processMove(type, desc) {
 
         let next_i = (i + 1) % list.length;
         
-        // Refresh local Manager UI
+        // Immediate UI refresh for Manager
         updateManagerUI(list, next_i);
 
         // Sync to cloud for Scoreboard
@@ -136,18 +138,16 @@ async function processMove(type, desc) {
             last_event: desc 
         }).eq('id', r_id);
 
-    } catch (e) {
-        console.error("MOVE ERROR:", e);
-    }
+    } catch (e) { console.error("MOVE ERROR:", e); }
 }
 
 // 7. REFRESH MANAGER STANDINGS LEDGER
 function updateManagerUI(list, activeIdx) {
     document.getElementById('up-now').innerText = list[activeIdx].name;
     document.getElementById('ledger-list').innerHTML = list.map((p, i) => `
-        <div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400' : 'text-gray-400'}">
+        <div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400 font-black' : 'text-gray-400'}">
             <span>${i === activeIdx ? '🍺 ' : ''}${p.name}</span>
-            <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-500'}">
+            <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-500'} font-mono">
                 ${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}
             </span>
         </div>
@@ -164,8 +164,8 @@ async function runSettlement() {
     
     if (takers.length === 0) {
         document.getElementById('settlement-list').innerHTML = `
-            <div class="bg-gray-900 p-6 rounded-3xl border-2 border-dashed border-gray-800 text-center text-xs text-gray-500 uppercase">
-                NO WINNERS YET. GAME MUST CONTINUE UNTIL A POT IS WON.
+            <div class="p-6 text-center text-xs text-gray-500 border border-dashed border-gray-800 rounded-2xl uppercase font-bold">
+                NO WINNERS YET. NEED AT LEAST ONE PERSON IN THE GREEN.
             </div>`;
         document.getElementById('settlement-area').classList.remove('hidden');
         return;
@@ -188,7 +188,7 @@ async function runSettlement() {
         <div class="bg-gray-900 p-6 rounded-3xl border-2 border-gray-800 flex flex-col items-center mb-2 shadow-inner uppercase font-black">
             <div class="flex justify-between w-full italic text-sm">
                 <span class="text-red-500">${t.f}</span>
-                <span class="text-white text-2xl tabular-nums">$${t.a}</span>
+                <span class="text-white text-2xl tabular-nums tracking-tighter">$${t.a}</span>
                 <span class="text-green-500">${t.t}</span>
             </div>
             <div class="text-[9px] text-gray-500 tracking-[0.4em] mt-1">PAYS</div>
@@ -200,7 +200,8 @@ async function runSettlement() {
 
 // 9. SHARE UTILITY
 function copyShareLink(btn) {
-    const url = window.location.origin + "/index.html?id=" + r_id;
+    // Dynamically builds the scoreboard URL based on current path
+    const url = window.location.origin + window.location.pathname.replace('setup.html', 'index.html') + "?id=" + r_id;
     navigator.clipboard.writeText(url).then(() => {
         btn.innerText = "COPIED!";
         setTimeout(() => btn.innerText = "🔗 SCOREBOARD LINK", 2000);

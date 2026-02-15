@@ -4,7 +4,7 @@ const sb = supabase.createClient(S_URL, S_KEY);
 
 let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "", unit = 5;
 
-// 1. ADD PLAYER TO PRE-GAME LIST
+// 1. ADD PLAYER TO LINEUP
 function addPlayer() {
     const el = document.getElementById('p-input');
     const val = el.value.trim().toUpperCase();
@@ -15,7 +15,7 @@ function addPlayer() {
     }
 }
 
-// 2. RENDER THE PRE-GAME LINEUP
+// 2. DRAW PRE-GAME LIST
 function draw() {
     const listEl = document.getElementById('p-list');
     listEl.innerHTML = roster.map((p, i) => 
@@ -26,7 +26,7 @@ function draw() {
     ).join('');
 }
 
-// 3. FETCH HISTORICAL GAMES (JULY 10, 2025)
+// 3. FETCH HISTORICAL GAMES
 async function findGames(e) {
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
@@ -46,11 +46,11 @@ async function findGames(e) {
     } catch (err) { console.error("Fetch Error:", err); }
 }
 
-// 4. INITIALIZE THE LIVE SESSION
+// 4. START GAME SESSION
 async function startGame() {
     if (roster.length < 2) return alert("ADD 2+ PLAYERS!");
     const sel = document.getElementById('game-select');
-    if (!sel.value) return alert("SELECT A GAME!");
+    if (!sel.value) return alert("SELECT A GAME FIRST!");
 
     gameName = sel.options[sel.selectedIndex].text;
     unit = parseFloat(document.getElementById('base-bet').value); 
@@ -65,7 +65,6 @@ async function startGame() {
     
     updateManagerUI(roster, 0);
 
-    // Initial Database Push
     await sb.from('games').insert([{ 
         id: r_id, 
         players: roster, 
@@ -76,10 +75,10 @@ async function startGame() {
     }]);
 
     selectedGamePk = sel.value;
-    setInterval(checkMLB, 15000); // 15s refresh cycle
+    setInterval(checkMLB, 15000); // 15s refresh
 }
 
-// 5. POLL MLB API FOR NEXT PLAY
+// 5. POLL MLB FEED (HISTORICAL PLAYBACK)
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
@@ -104,7 +103,7 @@ async function checkMLB() {
 // 6. CALCULATE BALANCES & SYNC SUPABASE
 async function processMove(type, desc) {
     try {
-        // Fetch current state to avoid 406 error and stale data
+        // Fetch current state using array-fetch to avoid 406 errors
         const { data, error } = await sb.from('games').select('*').eq('id', r_id);
         if (error || !data || data.length === 0) return;
         
@@ -113,6 +112,7 @@ async function processMove(type, desc) {
         let list = g.players;
         let i = g.current_holder_index;
 
+        // Logic based on event type
         if (type.includes('strikeout')) { pot += (unit * 2); list[i].balance -= (unit * 2); } 
         else if (type.includes('out')) { pot += unit; list[i].balance -= unit; } 
         else if (type.includes('single')) { let win = Math.min(pot, unit); pot -= win; list[i].balance += win; } 
@@ -147,7 +147,7 @@ function updateManagerUI(list, activeIdx) {
     ).join('');
 }
 
-// 8. GENERATE FINAL SETTLEMENT CARDS
+// 8. FINAL SETTLEMENT MATH
 async function runSettlement() {
     const { data } = await sb.from('games').select('*').eq('id', r_id);
     if (!data || data.length === 0) return;
@@ -188,7 +188,7 @@ async function runSettlement() {
     document.getElementById('manager-controls').classList.add('hidden');
 }
 
-// 9. COPY SHARE LINK TO CLIPBOARD
+// 9. SHARE LINK
 function copyShareLink(btn) {
     const url = window.location.origin + window.location.pathname.replace('setup.html', 'index.html') + "?id=" + r_id;
     navigator.clipboard.writeText(url).then(() => {

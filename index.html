@@ -10,6 +10,10 @@
 <body class="bg-black text-white p-6 font-sans">
     <div class="max-w-md mx-auto space-y-6">
         
+        <div class="text-center">
+            <h2 id="game-name" class="text-[12px] font-black uppercase text-gray-500 tracking-[0.3em] italic">Loading Game...</h2>
+        </div>
+
         <div class="bg-gray-900 border border-yellow-500/20 p-4 rounded-2xl text-center shadow-lg">
             <p class="text-[10px] font-black uppercase text-gray-500 mb-1 tracking-widest">Live Feed</p>
             <div id="pbp-display" class="text-lg font-bold italic text-yellow-500 leading-tight">Waiting for play...</div>
@@ -27,26 +31,22 @@
     </div>
 
     <script>
-        // Supabase configuration
         const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
-        
-        // Grab the unique game ID from the URL
         const gameId = new URLSearchParams(window.location.search).get('id');
 
         async function instantSync() {
             if (!gameId) return;
             try {
-                // Fetch the latest game state from Supabase
-                const { data, error } = await sb.from('games').select('*').eq('id', gameId).single();
-                
+                const { data } = await sb.from('games').select('*').eq('id', gameId).single();
                 if (data) {
-                    // Update the Pot and Play Description
+                    // Update Game Name
+                    document.getElementById('game-name').innerText = data.game_name || "Pass Da Cup Live";
+                    
                     document.getElementById('pot').innerText = `$${parseFloat(data.pot_total).toFixed(2)}`;
                     document.getElementById('pbp-display').innerText = data.last_event || "Play Ball!";
                     
-                    // Render the Lineup with the Active Beer Icon
                     document.getElementById('player-list').innerHTML = data.players.map((p, i) => `
                         <div class="flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-200 ${i === data.current_holder_index ? 'bg-blue-600 border-blue-400 scale-105 shadow-xl' : 'bg-gray-900 border-gray-800 opacity-60'}">
                             <span class="font-black uppercase italic text-lg">${i === data.current_holder_index ? '🍺 ' : ''}${p.name}</span>
@@ -56,16 +56,12 @@
                         </div>
                     `).join('');
 
-                    // Update the "Last Updated" timestamp
                     const now = new Date();
                     document.getElementById('sync-time').innerText = `Live Sync: ${now.toLocaleTimeString()}`;
                 }
-            } catch (e) {
-                document.getElementById('sync-time').innerText = "Sync Lost - Reconnecting...";
-            }
+            } catch (e) { console.log("Syncing..."); }
         }
 
-        // Initialize the 1-second loop
         if (gameId) {
             instantSync();
             setInterval(instantSync, 1000); 

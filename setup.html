@@ -4,7 +4,7 @@ const sb = supabase.createClient(S_URL, S_KEY);
 
 let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "";
 
-// 1. ADD PLAYER TO LINEUP
+// 1. ADD PLAYER
 function addPlayer() {
     const el = document.getElementById('p-input');
     const val = el.value.trim().toUpperCase();
@@ -15,7 +15,7 @@ function addPlayer() {
     }
 }
 
-// 2. DRAW INITIAL LINEUP LIST (PRE-GAME)
+// 2. DRAW LINEUP (Fixed Template Literals)
 function draw() {
     document.getElementById('p-list').innerHTML = roster.map((p, i) => `
         <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center">
@@ -25,7 +25,7 @@ function draw() {
     `).join('');
 }
 
-// 3. FETCH HISTORICAL MLB GAMES
+// 3. FETCH GAMES
 async function findGames(e) {
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
@@ -43,7 +43,7 @@ async function findGames(e) {
     } catch (err) { console.error("Game fetch failed", err); }
 }
 
-// 4. INITIALIZE SESSION
+// 4. START GAME
 async function startGame() {
     if (roster.length < 2) return alert("ADD 2+ PLAYERS!");
     const sel = document.getElementById('game-select');
@@ -53,7 +53,6 @@ async function startGame() {
     const unit = parseFloat(document.getElementById('base-bet').value);
     r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
     
-    // Set initial buy-in debt
     roster.forEach(p => p.balance = -unit);
 
     document.getElementById('setup-area').classList.add('hidden');
@@ -62,7 +61,6 @@ async function startGame() {
     
     updateManagerUI(roster, 0);
 
-    // Initial Database Push
     await sb.from('games').insert([{ 
         id: r_id, 
         players: roster, 
@@ -73,10 +71,10 @@ async function startGame() {
     }]);
 
     selectedGamePk = sel.value;
-    setInterval(checkMLB, 15000); // Poll every 15s
+    setInterval(checkMLB, 15000);
 }
 
-// 5. POLL MLB FEED (HISTORICAL REPLAY)
+// 5. CHECK MLB (Sequential Replay)
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
@@ -88,18 +86,15 @@ async function checkMLB() {
             const play = data.allPlays[nextIdx];
             document.getElementById('pbp-text').innerText = play.result.description;
             document.getElementById('replay-status').innerText = `PLAY #${nextIdx + 1} OF ${data.allPlays.length}`;
-            
-            // Trigger the math logic
             await processMove(play.result.event.toLowerCase(), play.result.description);
             lastIdx = nextIdx;
         }
     } catch (e) { console.error("FEED ERROR:", e); }
 }
 
-// 6. PROCESS MATH & UPDATE DB
+// 6. PROCESS MOVE (State Persistence)
 async function processMove(type, desc) {
     try {
-        // Re-fetch current state to prevent stale data
         let { data, error } = await sb.from('games').select('*').eq('id', r_id);
         if (error || !data || data.length === 0) return;
         
@@ -109,43 +104,28 @@ async function processMove(type, desc) {
         let i = g.current_holder_index;
         let u = parseFloat(document.getElementById('base-bet').value);
 
-        // Scoring Logic
-        if (type.includes('strikeout')) { 
-            pot += (u * 2); 
-            list[i].balance -= (u * 2); 
-        } else if (type.includes('out')) { 
-            pot += u; 
-            list[i].balance -= u; 
-        } else if (type.includes('single')) { 
-            let win = Math.min(pot, u);
-            pot -= win; 
-            list[i].balance += win; 
-        } else if (type.includes('hr')) { 
-            list[i].balance += pot; 
-            pot = 0; 
-        }
+        if (type.includes('strikeout')) { pot += (u * 2); list[i].balance -= (u * 2); } 
+        else if (type.includes('out')) { pot += u; list[i].balance -= u; } 
+        else if (type.includes('single')) { let win = Math.min(pot, u); pot -= win; list[i].balance += win; } 
+        else if (type.includes('hr')) { list[i].balance += pot; pot = 0; }
 
         let next_i = (i + 1) % list.length;
-        
-        // Immediate UI refresh for Manager
         updateManagerUI(list, next_i);
 
-        // Sync to cloud for Scoreboard
         await sb.from('games').update({ 
             pot_total: pot, 
             players: list, 
             current_holder_index: next_i, 
             last_event: desc 
         }).eq('id', r_id);
-
     } catch (e) { console.error("MOVE ERROR:", e); }
 }
 
-// 7. REFRESH MANAGER STANDINGS LEDGER
+// 7. UI REFRESH (Fixed HTML)
 function updateManagerUI(list, activeIdx) {
     document.getElementById('up-now').innerText = list[activeIdx].name;
     document.getElementById('ledger-list').innerHTML = list.map((p, i) => `
-        <div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400 font-black' : 'text-gray-400'}">
+        <div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400 font-bold' : 'text-gray-400'}">
             <span>${i === activeIdx ? '🍺 ' : ''}${p.name}</span>
             <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-500'} font-mono">
                 ${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}
@@ -154,19 +134,15 @@ function updateManagerUI(list, activeIdx) {
     `).join('');
 }
 
-// 8. FINAL SETTLEMENT CALCULATION
+// 8. SETTLEMENT
 async function runSettlement() {
     let { data } = await sb.from('games').select('*').eq('id', r_id);
     if (!data || data.length === 0) return;
-    
     let g = data[0];
     let takers = g.players.filter(p => p.balance > 0);
     
     if (takers.length === 0) {
-        document.getElementById('settlement-list').innerHTML = `
-            <div class="p-6 text-center text-xs text-gray-500 border border-dashed border-gray-800 rounded-2xl uppercase font-bold">
-                NO WINNERS YET. NEED AT LEAST ONE PERSON IN THE GREEN.
-            </div>`;
+        document.getElementById('settlement-list').innerHTML = `<div class="p-4 text-center text-xs text-gray-500 border border-dashed border-gray-800 rounded-xl">NO WINNERS YET.</div>`;
         document.getElementById('settlement-area').classList.remove('hidden');
         return;
     }
@@ -178,29 +154,24 @@ async function runSettlement() {
     while (gi < givers.length && ti < tks.length) {
         let pay = Math.min(givers[gi].a, tks[ti].a);
         if (pay > 0.01) txs.push({ f: givers[gi].n, t: tks[ti].n, a: pay.toFixed(2) });
-        givers[gi].a -= pay; 
-        tks[ti].a -= pay;
-        if (givers[gi].a < 0.01) gi++; 
-        if (tks[ti].a < 0.01) ti++;
+        givers[gi].a -= pay; tks[ti].a -= pay;
+        if (givers[gi].a < 0.01) gi++; if (tks[ti].a < 0.01) ti++;
     }
 
     document.getElementById('settlement-list').innerHTML = txs.map(t => `
-        <div class="bg-gray-900 p-6 rounded-3xl border-2 border-gray-800 flex flex-col items-center mb-2 shadow-inner uppercase font-black">
-            <div class="flex justify-between w-full italic text-sm">
+        <div class="bg-gray-900 p-4 rounded-2xl border border-gray-800 flex flex-col items-center mb-2">
+            <div class="flex justify-between w-full font-black italic text-sm">
                 <span class="text-red-500">${t.f}</span>
-                <span class="text-white text-2xl tabular-nums tracking-tighter">$${t.a}</span>
+                <span class="text-white text-xl">$${t.a}</span>
                 <span class="text-green-500">${t.t}</span>
             </div>
             <div class="text-[9px] text-gray-500 tracking-[0.4em] mt-1">PAYS</div>
         </div>`).join('');
-    
     document.getElementById('settlement-area').classList.remove('hidden');
-    document.getElementById('manager-controls').classList.add('hidden');
 }
 
-// 9. SHARE UTILITY
+// 9. SHARE LINK
 function copyShareLink(btn) {
-    // Dynamically builds the scoreboard URL based on current path
     const url = window.location.origin + window.location.pathname.replace('setup.html', 'index.html') + "?id=" + r_id;
     navigator.clipboard.writeText(url).then(() => {
         btn.innerText = "COPIED!";

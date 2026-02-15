@@ -8,14 +8,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-black text-white p-6 font-sans">
-    <div class="max-w-md mx-auto space-y-6">
+    <div class="max-w-md mx-auto space-y-6 pb-20">
         <h1 class="text-3xl font-black italic text-yellow-500 uppercase text-center tracking-tighter">Manager Pro</h1>
 
         <div id="setup-area" class="space-y-4">
             <button onclick="findGames(event)" class="w-full bg-gray-800 p-3 rounded-lg text-[10px] font-bold uppercase border border-gray-700">Find July 10, 2025 Games</button>
             <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500"></select>
 
-            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Set Base Bet</p>
             <select id="base-bet" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg font-bold text-green-500">
                 <option value="1">$1.00</option>
                 <option value="5" selected>$5.00</option>
@@ -28,14 +27,20 @@
             </div>
             <div id="p-list" class="space-y-2"></div>
 
-            <button onclick="startGame()" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg shadow-yellow-500/20">Start Replay Session</button>
+            <button onclick="startGame()" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl uppercase shadow-lg">Start Game</button>
         </div>
 
         <div id="remote" class="hidden space-y-4">
-            <div class="bg-blue-600 p-5 rounded-3xl text-center shadow-lg border-b-8 border-blue-800">
-                <p class="text-[10px] font-black uppercase text-blue-100 mb-1 tracking-widest">Cup is with:</p>
-                <h2 id="up-now" class="text-5xl font-black uppercase italic tracking-tighter">---</h2>
+            <div class="text-center">
+                <p id="game-title-display" class="text-[10px] font-black uppercase text-gray-500 tracking-[0.2em] italic"></p>
             </div>
+
+            <div class="bg-blue-600 p-5 rounded-3xl text-center shadow-lg border-b-8 border-blue-800">
+                <p class="text-[10px] font-black uppercase text-blue-100 mb-1 tracking-widest text-center">Cup is with:</p>
+                <h2 id="up-now" class="text-5xl font-black uppercase italic tracking-tighter text-center">---</h2>
+            </div>
+
+            <button onclick="move('hr', 'MANUAL WINNER TRIGGERED')" class="w-full bg-green-900/40 border-2 border-green-700 py-3 rounded-xl font-black uppercase text-[10px] text-green-400">Force Pot Win (HR)</button>
 
             <div class="bg-gray-900 p-4 rounded-2xl border border-gray-800">
                 <p class="text-[10px] font-black text-gray-600 uppercase mb-3 text-center tracking-widest">Live Standings</p>
@@ -43,8 +48,8 @@
             </div>
 
             <div class="bg-gray-900 p-4 rounded-2xl border border-gray-800 text-center">
-                <p id="pbp-text" class="text-[11px] italic text-yellow-500 font-bold uppercase leading-tight">Syncing Historical Feed...</p>
-                <p id="replay-status" class="text-[8px] text-gray-600 uppercase mt-2 font-bold">Waiting for playback...</p>
+                <p id="pbp-text" class="text-[11px] italic text-yellow-500 font-bold uppercase leading-tight">Syncing Feed...</p>
+                <p id="replay-status" class="text-[8px] text-gray-600 uppercase mt-2 font-bold"></p>
             </div>
 
             <div id="settlement-area" class="mt-4 border-t-2 border-red-900 pt-8 hidden">
@@ -62,7 +67,7 @@
         const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
-        let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, unit = 5;
+        let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, unit = 5, gameName = "";
 
         function addPlayer() {
             const val = document.getElementById('p-input').value.trim().toUpperCase();
@@ -78,28 +83,33 @@
             const data = await resp.json();
             const select = document.getElementById('game-select');
             select.innerHTML = '<option value="">-- Select Game --</option>';
-            data.dates[0].games.forEach(g => { let opt = document.createElement('option'); opt.value = g.gamePk; opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; select.appendChild(opt); });
+            data.dates[0].games.forEach(g => { 
+                let opt = document.createElement('option'); 
+                opt.value = g.gamePk; 
+                opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; 
+                select.appendChild(opt); 
+            });
             select.classList.remove('hidden'); e.target.classList.add('hidden');
         }
 
         async function startGame() {
             if (roster.length < 2) return alert("Add 2+ players!");
+            const sel = document.getElementById('game-select');
+            gameName = sel.options[sel.selectedIndex].text;
             unit = parseFloat(document.getElementById('base-bet').value);
             r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
             roster.forEach(p => p.balance = -unit);
 
             document.getElementById('setup-area').classList.add('hidden');
             document.getElementById('remote').classList.remove('hidden');
+            document.getElementById('game-title-display').innerText = gameName;
             
             updateUI(roster, 0);
             
-            await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (unit * roster.length), current_holder_index: 0, last_event: "Waiting for first pitch..." }]);
-            selectedGamePk = document.getElementById('game-select').value;
-            
-            if(selectedGamePk) {
-                // START PLAYBACK LOOP
-                setInterval(checkMLB, 15000); 
-            }
+            // PUSHING GAME NAME TO DATABASE
+            await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (unit * roster.length), current_holder_index: 0, last_event: "Play Ball!", game_name: gameName }]);
+            selectedGamePk = sel.value;
+            if(selectedGamePk) setInterval(checkMLB, 15000);
         }
 
         async function checkMLB() {
@@ -107,40 +117,29 @@
                 const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
                 const data = await resp.json();
                 if (!data.allPlays) return;
-
-                // Move forward by one play each time the timer hits
                 const nextIdx = lastIdx + 1;
-                
                 if (data.allPlays[nextIdx]) {
                     const play = data.allPlays[nextIdx];
-                    const desc = play.result.description;
-                    const event = play.result.event.toLowerCase();
-                    
-                    document.getElementById('pbp-text').innerText = desc;
-                    document.getElementById('replay-status').innerText = `Replaying Play #${nextIdx + 1} of ${data.allPlays.length}`;
-                    
-                    move(event, desc);
+                    document.getElementById('pbp-text').innerText = play.result.description;
+                    document.getElementById('replay-status').innerText = `Play #${nextIdx + 1} of ${data.allPlays.length}`;
+                    move(play.result.event.toLowerCase(), play.result.description);
                     lastIdx = nextIdx;
-                } else {
-                    document.getElementById('replay-status').innerText = "END OF GAME REPLAYED.";
                 }
-            } catch(e) { console.log("Replay sync issue..."); }
+            } catch(e) { console.log("Feed check..."); }
         }
 
         async function move(type, desc) {
             try {
                 let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
                 let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index;
-                
                 if (type.includes('strikeout')){ pot += (unit*2); list[i].balance -= (unit*2); }
                 else if (type.includes('out')){ pot += unit; list[i].balance -= unit; }
                 else if (type.includes('single')){ let a=Math.min(pot,unit); pot-=a; list[i].balance+=a; }
                 else if (type.includes('hr')){ list[i].balance+=pot; pot=0; }
-
                 let next_i = (i + 1) % list.length;
                 updateUI(list, next_i);
                 await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: desc }).eq('id', r_id);
-            } catch(e) { console.log("DB Error"); }
+            } catch(e) { console.log("Update Error"); }
         }
 
         function updateUI(list, idx) {
@@ -151,23 +150,32 @@
                     <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-500'}">${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}</span>
                 </div>`).join('');
         }
-        
+
         async function runSettlement() {
             let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
-            let givers = g.players.filter(p => p.balance < 0).map(p => ({ n: p.name, a: Math.abs(p.balance) }));
-            let takers = g.players.filter(p => p.balance > 0).map(p => ({ n: p.name, a: p.balance }));
-        
-            // NEW UX CHECK
+            let takers = g.players.filter(p => p.balance > 0);
             if (takers.length === 0) {
-                document.getElementById('settlement-list').innerHTML = `
-                    <div class="p-8 text-center bg-gray-900 rounded-3xl border-2 border-dashed border-gray-800">
-                        <p class="text-yellow-500 font-black uppercase italic">No Winners Yet</p>
-                        <p class="text-[10px] text-gray-500 mt-2 uppercase">The pot is currently $${g.pot_total.toFixed(2)}. Someone needs to hit a Single or HR before you can settle up!</p>
-                    </div>`;
+                document.getElementById('settlement-list').innerHTML = `<div class="bg-gray-900 p-6 rounded-3xl border-2 border-dashed border-gray-800 text-center text-xs uppercase text-gray-500">No Winners Yet.</div>`;
                 document.getElementById('settlement-area').classList.remove('hidden');
                 return;
-    }
-
+            }
+            let givers = g.players.filter(p => p.balance < 0).map(p => ({ n: p.name, a: Math.abs(p.balance) }));
+            let tks = takers.map(p => ({ n: p.name, a: p.balance }));
+            let txs = [], gi=0, ti=0;
+            while(gi < givers.length && ti < tks.length) {
+                let pay = Math.min(givers[gi].a, tks[ti].a);
+                if(pay > 0.01) txs.push({ f: givers[gi].n, t: tks[ti].n, a: pay.toFixed(2) });
+                givers[gi].a -= pay; tks[ti].a -= pay;
+                if(givers[gi].a < 0.01) gi++; if(tks[ti].a < 0.01) ti++;
+            }
+            document.getElementById('settlement-list').innerHTML = txs.map(t => `
+                <div class="bg-gray-900 p-6 rounded-3xl border-2 border-gray-800 flex flex-col items-center">
+                    <div class="flex justify-between w-full font-black uppercase italic text-sm"><span class="text-red-500">${t.f}</span><span class="text-white text-2xl">$${t.a}</span><span class="text-green-500">${t.t}</span></div>
+                    <div class="text-[9px] font-black text-gray-500 tracking-[0.4em]">PAYS</div>
+                </div>`).join('');
+            document.getElementById('settlement-area').classList.remove('hidden');
+            document.getElementById('manager-controls').classList.add('hidden');
+        }
 
         function copyShareLink(btn) {
             navigator.clipboard.writeText(window.location.origin + "/index.html?id=" + r_id).then(() => { btn.innerText = "COPIED!"; setTimeout(() => btn.innerText = "🔗 Scoreboard Link", 2000); });

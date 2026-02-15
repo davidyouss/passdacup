@@ -3,31 +3,37 @@ const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
 const sb = supabase.createClient(S_URL, S_KEY);
 
 let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "", unit = 5;
-let pollInterval = null; // Store interval to clear it later
+let pollInterval = null;
+let isTestMode = false;
 
-// 1. DYNAMIC DATE FETCH
+// 1. DYNAMIC DATE FETCH (Handles Live vs Historical Fallback)
 async function findGames(e) {
-    const today = new Date().toISOString().split('T')[0]; // Get current date
+    const today = new Date().toISOString().split('T')[0];
+    const testDate = "2025-07-10";
+    
     try {
-        const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${today}`);
-        const data = await resp.json();
-        const select = document.getElementById('game-select');
-        select.innerHTML = '<option value="">-- SELECT LIVE GAME --</option>';
+        let resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${today}`);
+        let data = await resp.json();
         
-        if (data.dates && data.dates[0]) {
-            data.dates[0].games.forEach(g => {
-                let opt = document.createElement('option');
-                opt.value = g.gamePk;
-                opt.text = `${g.teams.away.team.name.toUpperCase()} @ ${g.teams.home.team.name.toUpperCase()} (${g.status.abstractGameState})`;
-                select.appendChild(opt);
-            });
-            select.classList.remove('hidden');
-            e.target.classList.add('hidden');
-        } else {
-            alert("No games found for today. Reverting to July 10, 2025 for testing.");
-            fetchTestGames();
+        // If no games today, or if you want to test, use the fallback
+        if (!data.dates || data.dates.length === 0) {
+            console.log("No live games. Loading test data...");
+            resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${testDate}`);
+            data = await resp.json();
+            isTestMode = true;
         }
-    } catch (err) { console.error("Fetch Error:", err); }
+
+        const select = document.getElementById('game-select');
+        select.innerHTML = '<option value="">-- SELECT GAME --</option>';
+        data.dates[0].games.forEach(g => {
+            let opt = document.createElement('option');
+            opt.value = g.gamePk;
+            opt.text = `${g.teams.away.team.name.toUpperCase()} @ ${g.teams.home.team.name.toUpperCase()} (${g.status.abstractGameState})`;
+            select.appendChild(opt);
+        });
+        select.classList.remove('hidden');
+        e.target.classList.add('hidden');
+    } catch (err) { console.error("API Error:", err); }
 }
 
 // 2. START GAME
@@ -37,7 +43,7 @@ async function startGame() {
     if (!sel.value) return alert("SELECT A GAME!");
 
     gameName = sel.options[sel.selectedIndex].text;
-    unit = parseFloat(document.getElementById('base-bet').value); 
+    unit = parseFloat(document.getElementById('base-bet').value);
     r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
     
     roster.forEach(p => p.balance = -unit);
@@ -49,82 +55,93 @@ async function startGame() {
     updateManagerUI(roster, 0);
 
     const { error } = await sb.from('games').insert([{ 
-        id: r_id, 
-        players: roster, 
-        pot_total: (unit * roster.length), 
-        current_holder_index: 0, 
-        last_event: "PLAY BALL!", 
-        game_name: gameName 
+        id: r_id, players: roster, pot_total: (unit * roster.length), 
+        current_holder_index: 0, last_event: "PLAY BALL!", game_name: gameName 
     }]);
 
-    if (error) return alert("Supabase Connection Failed!");
+    if (error) return alert("Supabase Error: " + error.message);
 
     selectedGamePk = sel.value;
-    pollInterval = setInterval(checkMLB, 15000); // Start controlled polling
+    // CRITICAL: We poll every 15 seconds to simulate or track
+    pollInterval = setInterval(checkMLB, 15000);
 }
 
-// 3. ENHANCED EVENT HANDLING
-async function processMove(type, desc) {
-    try {
-        const { data, error } = await sb.from('games').select('*').eq('id', r_id);
-        if (error || !data || data.length === 0) return;
-        
-        const g = data[0];
-        let pot = parseFloat(g.pot_total);
-        let list = g.players;
-        let i = g.current_holder_index;
-
-        // EXPANDED EVENT LOGIC
-        if (type.includes('strikeout')) { pot += (unit * 2); list[i].balance -= (unit * 2); } 
-        else if (type.includes('out') || type.includes('fielder_choice')) { pot += unit; list[i].balance -= unit; } 
-        else if (type.includes('single') || type.includes('double') || type.includes('triple') || type.includes('walk') || type.includes('hit_by_pitch')) { 
-            let win = Math.min(pot, unit); 
-            pot -= win; 
-            list[i].balance += win; 
-        } 
-        else if (type.includes('home_run')) { 
-            list[i].balance += pot; 
-            pot = 0; 
-        }
-        // Ignores non-play events (stolen bases, etc.) to keep cup moving on ABs
-
-        let next_i = (i + 1) % list.length;
-        updateManagerUI(list, next_i);
-
-        await sb.from('games').update({ 
-            pot_total: pot, 
-            players: list, 
-            current_holder_index: next_i, 
-            last_event: desc 
-        }).eq('id', r_id);
-    } catch (e) { console.error("Move Error:", e); }
-}
-
-// 4. GAME END DETECTION
+// 3. THE REPLAY ENGINE (The Fix)
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
         const data = await resp.json();
-        
-        if (!data || !data.allPlays) return;
+        if (!data || !data.allPlays || data.allPlays.length === 0) return;
 
-        // Check if we've reached the end of the available plays
-        if (lastIdx >= data.allPlays.length - 1) {
-            const gameStatus = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/contextMetrics`);
-            const statusData = await gameStatus.json();
-            if (statusData.game && statusData.game.status.abstractGameState === 'Final') {
-                clearInterval(pollInterval);
-                runSettlement();
-                return;
-            }
-            return; // Just wait for next play
-        }
-
+        // In Replay Mode, we increment manually. In Live Mode, we wait for new plays.
         const nextIdx = lastIdx + 1;
-        const play = data.allPlays[nextIdx];
-        document.getElementById('pbp-text').innerText = play.result.description;
-        await processMove(play.result.event.toLowerCase(), play.result.description);
-        lastIdx = nextIdx;
-        
-    } catch (e) { console.error("Feed Error:", e); }
+
+        if (nextIdx < data.allPlays.length) {
+            const play = data.allPlays[nextIdx];
+            const eventType = play.result.event ? play.result.event.toLowerCase() : "";
+            const desc = play.result.description || "In progress...";
+            
+            document.getElementById('pbp-text').innerText = desc;
+            document.getElementById('replay-status').innerText = `PLAY ${nextIdx + 1} OF ${data.allPlays.length}`;
+            
+            await processMove(eventType, desc);
+            lastIdx = nextIdx;
+        } else {
+            // End of Game Detection
+            if (!isTestMode) {
+                const statusResp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/contextMetrics`);
+                const s = await statusResp.json();
+                if (s.game && s.game.status.abstractGameState === 'Final') {
+                    endSession();
+                }
+            } else {
+                endSession(); // Auto-end test games
+            }
+        }
+    } catch (e) { console.error("Polling Error:", e); }
+}
+
+// 4. BALANCES AND ATOMIC UPDATES
+async function processMove(type, desc) {
+    // 1. Fetch current state to avoid race conditions
+    const { data } = await sb.from('games').select('*').eq('id', r_id).single();
+    if (!data) return;
+
+    let pot = parseFloat(data.pot_total);
+    let list = data.players;
+    let i = data.current_holder_index;
+
+    // COMPREHENSIVE EVENT MAPPING
+    const winEvents = ['single', 'double', 'triple', 'walk', 'hit_by_pitch', 'intent_walk'];
+    const outEvents = ['out', 'fielders_choice', 'force_out', 'grounded_into_double_play', 'sacrifice_fly', 'field_error'];
+    const strikeoutEvents = ['strikeout', 'strikeout_looking'];
+
+    if (strikeoutEvents.includes(type)) {
+        pot += (unit * 2);
+        list[i].balance -= (unit * 2);
+    } else if (outEvents.some(e => type.includes(e))) {
+        pot += unit;
+        list[i].balance -= unit;
+    } else if (winEvents.includes(type)) {
+        let winAmt = Math.min(pot, unit);
+        pot -= winAmt;
+        list[i].balance += winAmt;
+    } else if (type.includes('home_run')) {
+        list[i].balance += pot;
+        pot = 0;
+    }
+
+    let next_i = (i + 1) % list.length;
+    updateManagerUI(list, next_i);
+
+    await sb.from('games').update({ 
+        pot_total: pot, players: list, 
+        current_holder_index: next_i, last_event: desc 
+    }).eq('id', r_id);
+}
+
+function endSession() {
+    clearInterval(pollInterval);
+    document.getElementById('pbp-text').innerText = "GAME OVER";
+    runSettlement();
 }

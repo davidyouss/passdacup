@@ -1,42 +1,41 @@
-// 1. GLOBAL CONFIG
-const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
-const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
-const sb = supabase.createClient(S_URL, S_KEY);
+// 1. ATTACH TO WINDOW TO ENSURE ACCESSIBILITY
+window.S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
+window.S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
+window.sb = supabase.createClient(window.S_URL, window.S_KEY);
 
-let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "", unit = 5;
-let pollInterval = null;
+window.roster = []; 
+window.r_id = ""; 
+window.selectedGamePk = null; 
+window.lastIdx = -1; 
+window.gameName = ""; 
+window.unit = 5;
+window.pollInterval = null;
 
-console.log("MANAGER SYSTEM INITIALIZED");
+console.log("MANAGER SYSTEM BOOTED");
 
-// 2. ERROR CATCHER (If this doesn't show an alert on error, your script isn't loading at all)
-window.onerror = function(msg, url, line) {
-    alert("CRITICAL ERROR: " + msg + "\nLine: " + line);
-    return false;
-};
-
-// 3. ADD PLAYER
+// 2. ADD PLAYER
 window.addPlayer = function() {
     const el = document.getElementById('p-input');
     if (!el || !el.value) return;
     const val = el.value.trim().toUpperCase();
-    roster.push({ name: val, balance: 0 });
+    window.roster.push({ name: val, balance: 0 });
     el.value = "";
-    draw();
+    window.draw();
 };
 
-// 4. DRAW LINEUP
+// 3. DRAW LINEUP
 window.draw = function() {
     const listEl = document.getElementById('p-list');
     if (!listEl) return;
-    listEl.innerHTML = roster.map((p, i) => `
+    listEl.innerHTML = window.roster.map((p, i) => `
         <div class="flex justify-between p-2 mb-1 bg-gray-800 rounded border border-gray-700">
             <span>${p.name}</span>
-            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-bold">X</button>
+            <button onclick="window.roster.splice(${i},1);window.draw()" class="text-red-500 font-bold px-2">X</button>
         </div>
     `).join('');
 };
 
-// 5. FETCH GAMES
+// 4. FETCH GAMES (JULY 10, 2025)
 window.findGames = async function(e) {
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
@@ -53,86 +52,97 @@ window.findGames = async function(e) {
         });
         select.classList.remove('hidden');
         if (e && e.target) e.target.classList.add('hidden');
-    } catch (err) { console.error("Game Fetch Error:", err); }
+        console.log("Games loaded successfully");
+    } catch (err) { console.error("API Error:", err); }
 };
 
-// 6. START GAME
+// 5. START GAME
 window.startGame = async function() {
-    if (roster.length < 2) return alert("ADD 2+ PLAYERS!");
+    if (window.roster.length < 2) return alert("ADD 2+ PLAYERS!");
     const sel = document.getElementById('game-select');
     if (!sel || !sel.value) return alert("SELECT A GAME!");
 
-    gameName = sel.options[sel.selectedIndex].text;
-    unit = parseFloat(document.getElementById('base-bet').value) || 5; 
-    r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
+    window.gameName = sel.options[sel.selectedIndex].text;
+    window.unit = parseFloat(document.getElementById('base-bet').value) || 5; 
+    window.r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
     
-    roster.forEach(p => p.balance = -unit);
+    window.roster.forEach(p => p.balance = -window.unit);
     
     document.getElementById('setup-area').classList.add('hidden');
     document.getElementById('remote').classList.remove('hidden');
-    document.getElementById('game-title-display').innerText = gameName;
+    document.getElementById('game-title-display').innerText = window.gameName;
     
-    updateManagerUI(roster, 0);
+    window.updateManagerUI(window.roster, 0);
 
-    const { error } = await sb.from('games').insert([{ 
-        id: r_id, 
-        players: roster, 
-        pot_total: (unit * roster.length), 
+    const { error } = await window.sb.from('games').insert([{ 
+        id: window.r_id, 
+        players: window.roster, 
+        pot_total: (window.unit * window.roster.length), 
         current_holder_index: 0, 
         last_event: "PLAY BALL!", 
-        game_name: gameName 
+        game_name: window.gameName 
     }]);
 
     if (error) return alert("Supabase Error: " + error.message);
-    selectedGamePk = sel.value;
-    pollInterval = setInterval(checkMLB, 15000);
+    window.selectedGamePk = sel.value;
+    window.pollInterval = setInterval(window.checkMLB, 10000); 
 };
 
-// 7. REPLAY ENGINE
-async function checkMLB() {
+// 6. REPLAY ENGINE
+window.checkMLB = async function() {
     try {
-        const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
+        const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${window.selectedGamePk}/playByPlay`);
         const data = await resp.json();
-        const nextIdx = lastIdx + 1;
+        const nextIdx = window.lastIdx + 1;
         
         if (data.allPlays && data.allPlays[nextIdx]) {
             const play = data.allPlays[nextIdx];
             const event = (play.result.event || "").toLowerCase();
-            const desc = play.result.description || "Next batter...";
+            const desc = play.result.description || "In progress...";
             
             document.getElementById('pbp-text').innerText = desc;
-            await processMove(event, desc);
-            lastIdx = nextIdx;
+            await window.processMove(event, desc);
+            window.lastIdx = nextIdx;
         }
-    } catch (e) { console.log("Polling for updates..."); }
-}
+    } catch (e) { console.log("Feed check..."); }
+};
 
-// 8. PROCESS MOVE
-async function processMove(type, desc) {
-    const { data } = await sb.from('games').select('*').eq('id', r_id);
+// 7. PROCESS MOVE
+window.processMove = async function(type, desc) {
+    const { data } = await window.sb.from('games').select('*').eq('id', window.r_id);
     if (!data || !data[0]) return;
     
     const g = data[0];
     let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index;
 
-    if (type.includes('strikeout')) { pot += (unit * 2); list[i].balance -= (unit * 2); }
-    else if (type.includes('out')) { pot += unit; list[i].balance -= unit; }
-    else if (type.includes('single')) { let win = Math.min(pot, unit); pot -= win; list[i].balance += win; }
-    else if (type.includes('home_run')) { list[i].balance += pot; pot = 0; }
+    if (type.includes('strikeout')) { 
+        pot += (window.unit * 2); 
+        list[i].balance -= (window.unit * 2); 
+    } else if (type.includes('out')) { 
+        pot += window.unit; 
+        list[i].balance -= window.unit; 
+    } else if (type.includes('single')) { 
+        let win = Math.min(pot, window.unit); 
+        pot -= win; 
+        list[i].balance += win; 
+    } else if (type.includes('home_run')) { 
+        list[i].balance += pot; 
+        pot = 0; 
+    }
 
     let next_i = (i + 1) % list.length;
-    updateManagerUI(list, next_i);
+    window.updateManagerUI(list, next_i);
     
-    await sb.from('games').update({ 
+    await window.sb.from('games').update({ 
         pot_total: pot, 
         players: list, 
         current_holder_index: next_i, 
         last_event: desc 
-    }).eq('id', r_id);
-}
+    }).eq('id', window.r_id);
+};
 
-// 9. UI REFRESH
-function updateManagerUI(list, activeIdx) {
+// 8. UI REFRESH
+window.updateManagerUI = function(list, activeIdx) {
     const upNowEl = document.getElementById('up-now');
     if (upNowEl) upNowEl.innerText = list[activeIdx].name;
     const ledger = document.getElementById('ledger-list');
@@ -143,4 +153,4 @@ function updateManagerUI(list, activeIdx) {
             <span>$${p.balance.toFixed(2)}</span>
         </div>
     `).join('');
-}
+};

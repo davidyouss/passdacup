@@ -16,18 +16,18 @@ function addPlayer() {
     }
 }
 
-// 2. DRAW INITIAL LIST
+// 2. DRAW PRE-GAME LIST
 function draw() {
     const listEl = document.getElementById('p-list');
-    listEl.innerHTML = roster.map((p, i) => 
-        `<div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center mb-2">
+    listEl.innerHTML = roster.map((p, i) => `
+        <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center mb-2">
             <span>${p.name}</span>
             <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-black px-2">X</button>
-        </div>`
-    ).join('');
+        </div>
+    `).join('');
 }
 
-// 3. FETCH HISTORICAL GAMES
+// 3. FETCH HISTORICAL GAMES (JULY 10, 2025)
 async function findGames(e) {
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
@@ -80,7 +80,7 @@ async function startGame() {
     pollInterval = setInterval(checkMLB, 15000);
 }
 
-// 5. REPLAY ENGINE
+// 5. THE REPLAY ENGINE
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
@@ -91,7 +91,7 @@ async function checkMLB() {
         if (nextIdx < data.allPlays.length) {
             const play = data.allPlays[nextIdx];
             const eventType = play.result.event ? play.result.event.toLowerCase() : "";
-            const desc = play.result.description || "In progress...";
+            const desc = play.result.description || "Next batter up...";
             
             document.getElementById('pbp-text').innerText = desc;
             document.getElementById('replay-status').innerText = `PLAY ${nextIdx + 1} OF ${data.allPlays.length}`;
@@ -148,14 +148,14 @@ async function processMove(type, desc) {
 function updateManagerUI(list, activeIdx) {
     document.getElementById('up-now').innerText = list[activeIdx].name;
     const ledger = document.getElementById('ledger-list');
-    ledger.innerHTML = list.map((p, i) => 
-        `<div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400 font-black' : 'text-gray-400'} mb-1">
+    ledger.innerHTML = list.map((p, i) => `
+        <div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400 font-bold' : 'text-gray-400'} mb-1">
             <span>${i === activeIdx ? '🍺 ' : ''}${p.name}</span>
             <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-500'} font-mono">
                 ${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}
             </span>
-        </div>`
-    ).join('');
+        </div>
+    `).join('');
 }
 
 // 8. SETTLEMENT
@@ -182,16 +182,15 @@ async function runSettlement() {
         if (givers[gi].a < 0.01) gi++; if (tks[ti].a < 0.01) ti++;
     }
 
-    document.getElementById('settlement-list').innerHTML = txs.map(t => 
-        `<div class="bg-gray-900 p-5 rounded-3xl border-2 border-gray-800 flex flex-col items-center mb-2 shadow-inner uppercase font-black">
-            <div class="flex justify-between w-full italic text-sm">
+    document.getElementById('settlement-list').innerHTML = txs.map(t => `
+        <div class="bg-gray-900 p-4 rounded-2xl border border-gray-800 flex flex-col items-center mb-2">
+            <div class="flex justify-between w-full font-black italic text-sm">
                 <span class="text-red-500">${t.f}</span>
-                <span class="text-white text-2xl tabular-nums tracking-tighter">$${t.a}</span>
+                <span class="text-white text-xl">$${t.a}</span>
                 <span class="text-green-500">${t.t}</span>
             </div>
-            <div class="text-[9px] text-gray-500 tracking-[0.4em] mt-1">PAYS</div>
-        </div>`
-    ).join('');
+            <div class="text-[9px] text-gray-500 tracking-[0.4em] mt-1 uppercase">PAYS</div>
+        </div>`).join('');
     document.getElementById('settlement-area').classList.remove('hidden');
 }
 

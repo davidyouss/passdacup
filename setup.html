@@ -20,11 +20,10 @@
 
             <div class="space-y-2">
                 <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">2. Set Base Bet</p>
-                <select id="base-bet" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg font-bold text-green-500 outline-none">
+                <select id="base-bet" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg font-bold text-green-500">
                     <option value="1">$1.00</option>
                     <option value="5" selected>$5.00</option>
                     <option value="10">$10.00</option>
-                    <option value="20">$20.00</option>
                 </select>
             </div>
 
@@ -42,12 +41,12 @@
 
         <div id="remote" class="hidden space-y-4 pt-4">
             <div class="bg-blue-600 p-5 rounded-3xl text-center shadow-lg border-b-8 border-blue-800">
-                <p class="text-[10px] font-black uppercase text-blue-100 mb-1 tracking-widest">Cup is with:</p>
-                <h2 id="up-now" class="text-5xl font-black uppercase italic tracking-tighter">---</h2>
+                <p class="text-[10px] font-black uppercase text-blue-100 mb-1 tracking-widest text-center">Cup is with:</p>
+                <h2 id="up-now" class="text-5xl font-black uppercase italic tracking-tighter text-center">---</h2>
             </div>
 
             <div class="bg-gray-900 p-4 rounded-2xl border border-gray-800">
-                <p class="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] mb-2 text-center">Live Standings</p>
+                <p class="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] mb-3 text-center">Live Standings</p>
                 <div id="ledger-list" class="space-y-2"></div>
             </div>
 
@@ -75,20 +74,11 @@
 
         function addPlayer() {
             const el = document.getElementById('p-input');
-            if (el.value.trim()) { 
-                roster.push({ name: el.value.trim().toUpperCase(), balance: 0 }); 
-                el.value = ""; 
-                draw(); 
-            }
+            if (el.value.trim()) { roster.push({ name: el.value.trim().toUpperCase(), balance: 0 }); el.value = ""; drawLineup(); }
         }
 
-        function draw() {
-            document.getElementById('p-list').innerHTML = roster.map((p, i) => `
-                <div class="bg-gray-900 p-3 rounded-lg flex justify-between items-center border border-gray-800 font-bold text-xs">
-                    <span>${p.name}</span>
-                    <button onclick="roster.splice(${i},1);draw()" class="text-red-500 px-2 text-lg">×</button>
-                </div>
-            `).join('');
+        function drawLineup() {
+            document.getElementById('p-list').innerHTML = roster.map((p, i) => `<div class="bg-gray-900 p-3 rounded-lg flex justify-between font-bold text-xs uppercase"><span>${p.name}</span><button onclick="roster.splice(${i},1);drawLineup()" class="text-red-500 px-2 text-lg">×</button></div>`).join('');
         }
 
         async function findGames(e) {
@@ -96,12 +86,7 @@
             const data = await resp.json();
             const select = document.getElementById('game-select');
             select.innerHTML = '<option value="">-- Select Game --</option>';
-            data.dates[0].games.forEach(g => { 
-                let opt = document.createElement('option'); 
-                opt.value = g.gamePk; 
-                opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; 
-                select.appendChild(opt); 
-            });
+            data.dates[0].games.forEach(g => { let opt = document.createElement('option'); opt.value = g.gamePk; opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; select.appendChild(opt); });
             select.classList.remove('hidden'); e.target.classList.add('hidden');
         }
 
@@ -109,15 +94,14 @@
             if (roster.length < 2) return alert("Add at least 2 players!");
             baseUnit = parseFloat(document.getElementById('base-bet').value);
             r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
-            roster.forEach(p => { p.balance = -baseUnit; p.unit = baseUnit; });
+            roster.forEach(p => { p.balance = -baseUnit; });
             
             await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (baseUnit * roster.length), current_holder_index: 0, last_event: "Play Ball!" }]);
             selectedGamePk = document.getElementById('game-select').value;
-            
             document.getElementById('setup-area').classList.add('hidden');
             document.getElementById('remote').classList.remove('hidden');
             document.getElementById('room-display').innerText = `CODE: ${r_id}`;
-            updateRemoteUI(roster, 0);
+            updateManagerUI(roster, 0);
             if(selectedGamePk) setInterval(checkMLB, 15000);
         }
 
@@ -134,29 +118,27 @@
                     processMove(data.allPlays[nextIdx].result.event.toLowerCase(), desc);
                     lastIdx = nextIdx;
                 }
-            } catch(e) { console.log("Waiting for data..."); }
+            } catch(e) { console.log("Feed delay..."); }
         }
 
         async function processMove(type, desc) {
             let { data: g } = await sb.from('games').select('*').eq('id', r_id).single();
             let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index, u = baseUnit;
-            
             if (type.includes('strikeout')){ pot += (u*2); list[i].balance -= (u*2); }
             else if (type.includes('out')){ pot += u; list[i].balance -= u; }
             else if (type.includes('single')){ let a=Math.min(pot,u); pot-=a; list[i].balance+=a; }
             else if (type.includes('hr')){ list[i].balance+=pot; pot=0; }
-
             let next_i = (i + 1) % list.length;
-            updateRemoteUI(list, next_i);
+            updateManagerUI(list, next_i);
             await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: desc }).eq('id', r_id);
         }
 
-        function updateRemoteUI(list, activeIdx) {
+        function updateManagerUI(list, activeIdx) {
             document.getElementById('up-now').innerText = list[activeIdx].name;
             document.getElementById('ledger-list').innerHTML = list.map((p, i) => `
                 <div class="flex justify-between items-center text-[11px] font-black uppercase ${i === activeIdx ? 'text-blue-400' : 'text-gray-400'}">
                     <span>${i === activeIdx ? '🍺 ' : ''}${p.name}</span>
-                    <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-500'}">${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}</span>
+                    <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-400'}">${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}</span>
                 </div>
             `).join('');
         }
@@ -173,13 +155,17 @@
                 if(givers[gi].a < 0.01) gi++; if(takers[ti].a < 0.01) ti++;
             }
             document.getElementById('settlement-list').innerHTML = txs.map(t => `
-                <div class="bg-gray-900 p-5 rounded-3xl border-2 border-gray-800 flex flex-col items-center space-y-2">
-                    <div class="flex justify-between w-full font-black uppercase italic text-sm">
-                        <span class="text-red-500">${t.f}</span>
-                        <span class="text-white text-2xl tabular-nums">$${t.a}</span>
-                        <span class="text-green-500">${t.t}</span>
+                <div class="bg-gray-900 p-6 rounded-3xl border-2 border-gray-800 flex flex-col items-center space-y-3">
+                    <div class="flex justify-between w-full items-baseline">
+                        <span class="text-red-500 font-black text-xl italic uppercase tracking-tighter">${t.f}</span>
+                        <span class="text-white font-black text-3xl tabular-nums tracking-tighter">$${t.a}</span>
+                        <span class="text-green-500 font-black text-xl italic uppercase tracking-tighter">${t.t}</span>
                     </div>
-                    <div class="text-[9px] font-black text-gray-500 tracking-[0.3em]">PAYS</div>
+                    <div class="w-full flex items-center justify-center space-x-4 opacity-70">
+                        <div class="h-[2px] flex-grow bg-gradient-to-r from-red-500/0 to-red-500"></div>
+                        <span class="text-[12px] font-black uppercase tracking-[0.4em] text-white">PAYS</span>
+                        <div class="h-[2px] flex-grow bg-gradient-to-r from-green-500 to-green-500/0"></div>
+                    </div>
                 </div>`).join('');
             document.getElementById('settlement-area').classList.remove('hidden');
             document.getElementById('manager-controls').classList.add('hidden');

@@ -1,4 +1,72 @@
-const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager | Pass Da Cup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-black text-white p-6 font-sans uppercase">
+    <div class="max-w-md mx-auto space-y-6 pb-20">
+        <h1 class="text-3xl font-black italic text-yellow-500 text-center tracking-tighter">MANAGER PRO</h1>
+
+        <div id="setup-area" class="space-y-4">
+            <button onclick="findGames(event)" class="w-full bg-gray-800 p-3 rounded-lg text-[10px] font-bold border border-gray-700">FIND JULY 10, 2025 GAMES</button>
+            <select id="game-select" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg text-sm hidden font-bold text-yellow-500 outline-none"></select>
+
+            <p class="text-[10px] font-bold text-gray-500 tracking-widest text-center">SET BASE BET</p>
+            <select id="base-bet" class="w-full bg-gray-900 border border-gray-800 p-3 rounded-lg font-bold text-green-500 outline-none">
+                <option value="1">$1.00</option>
+                <option value="5" selected>$5.00</option>
+                <option value="10">$10.00</option>
+            </select>
+
+            <div class="flex gap-2">
+                <input id="p-input" type="text" placeholder="NAME" class="flex-grow bg-gray-900 border border-gray-800 p-3 rounded-lg font-bold outline-none text-white">
+                <button onclick="addPlayer()" class="bg-blue-600 px-6 rounded-lg font-black text-xl">+</button>
+            </div>
+            <div id="p-list" class="space-y-2"></div>
+
+            <button onclick="startGame()" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl shadow-lg">START GAME</button>
+        </div>
+
+        <div id="remote" class="hidden space-y-4">
+            <div class="text-center">
+                <p id="game-title-display" class="text-[10px] font-black text-gray-500 tracking-[0.2em] italic"></p>
+            </div>
+
+            <div class="bg-blue-600 p-5 rounded-3xl text-center shadow-lg border-b-8 border-blue-800">
+                <p class="text-[10px] font-black text-blue-100 mb-1 tracking-widest">CUP IS WITH:</p>
+                <h2 id="up-now" class="text-5xl font-black italic tracking-tighter">---</h2>
+            </div>
+
+            <button onclick="move('hr', 'MANUAL WINNER TRIGGERED')" class="w-full bg-green-900/40 border-2 border-green-700 py-3 rounded-xl font-black text-[10px] text-green-400">FORCE POT WIN (HR)</button>
+
+            <div class="bg-gray-900 p-4 rounded-2xl border border-gray-800">
+                <p class="text-[10px] font-black text-gray-600 tracking-widest mb-3 text-center">LIVE STANDINGS</p>
+                <div id="ledger-list" class="space-y-2 text-[11px] font-black"></div>
+            </div>
+
+            <div class="bg-gray-900 p-4 rounded-2xl border border-gray-800 text-center">
+                <p id="pbp-text" class="text-[11px] italic text-yellow-500 font-bold leading-tight">SYNCING FEED...</p>
+                <p id="replay-status" class="text-[8px] text-gray-600 mt-2 font-bold"></p>
+            </div>
+
+            <div id="settlement-area" class="mt-4 border-t-2 border-red-900 pt-8 hidden">
+                <div id="settlement-list" class="space-y-4"></div>
+            </div>
+
+            <div id="manager-controls" class="space-y-2">
+                <button onclick="runSettlement()" class="w-full bg-red-600 text-white font-black py-5 rounded-2xl text-sm shadow-lg">🏁 END & SETTLE</button>
+                <button onclick="copyShareLink(this)" class="w-full bg-white text-black font-black py-3 rounded-xl text-[10px]">🔗 SCOREBOARD LINK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ... (Your variables and addPlayer/draw/findGames functions here)
+        const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
         let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, unit = 5, gameName = "";
@@ -9,18 +77,17 @@ const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         }
 
         function draw() {
-            document.getElementById('p-list').innerHTML = roster.map((p, i) => `<div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase"><span>${p.name}</span><button onclick="roster.splice(${i},1);draw()">X</button></div>`).join('');
+            document.getElementById('p-list').innerHTML = roster.map((p, i) => `<div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold"><span>${p.name}</span><button onclick="roster.splice(${i},1);draw()">X</button></div>`).join('');
         }
 
         async function findGames(e) {
             const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10`);
             const data = await resp.json();
             const select = document.getElementById('game-select');
-            select.innerHTML = '<option value="">-- Select Game --</option>';
+            select.innerHTML = '<option value="">-- SELECT GAME --</option>';
             data.dates[0].games.forEach(g => { 
-                let opt = document.createElement('option'); 
-                opt.value = g.gamePk; 
-                opt.text = `${g.teams.away.team.name} @ ${g.teams.home.team.name}`; 
+                let opt = document.createElement('option'); opt.value = g.gamePk; 
+                opt.text = `${g.teams.away.team.name.toUpperCase()} @ ${g.teams.home.team.name.toUpperCase()}`; 
                 select.appendChild(opt); 
             });
             select.classList.remove('hidden'); e.target.classList.add('hidden');
@@ -40,7 +107,7 @@ const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
             
             updateUI(roster, 0);
             
-            await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (unit * roster.length), current_holder_index: 0, last_event: "Play Ball!", game_name: gameName }]);
+            await sb.from('games').insert([{ id: r_id, players: roster, pot_total: (unit * roster.length), current_holder_index: 0, last_event: "PLAY BALL!", game_name: gameName }]);
             selectedGamePk = sel.value;
             if(selectedGamePk) setInterval(checkMLB, 15000);
         }
@@ -54,16 +121,16 @@ const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
                 if (data.allPlays[nextIdx]) {
                     const play = data.allPlays[nextIdx];
                     document.getElementById('pbp-text').innerText = play.result.description;
-                    document.getElementById('replay-status').innerText = `Play #${nextIdx + 1} of ${data.allPlays.length}`;
+                    document.getElementById('replay-status').innerText = `PLAY #${nextIdx + 1} OF ${data.allPlays.length}`;
                     move(play.result.event.toLowerCase(), play.result.description);
                     lastIdx = nextIdx;
                 }
-            } catch(e) { console.error("Feed Error:", e); }
+            } catch(e) { console.error("FEED ERROR:", e); }
         }
 
+        // UPDATED MOVE LOGIC TO PREVENT 406 ERROR
         async function move(type, desc) {
             try {
-                // Fetching without .single() to avoid 406 errors
                 let { data, error } = await sb.from('games').select('*').eq('id', r_id);
                 if (error || !data || data.length === 0) return;
                 
@@ -84,13 +151,13 @@ const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
                     current_holder_index: next_i, 
                     last_event: desc 
                 }).eq('id', r_id);
-            } catch(e) { console.error("Move Error:", e); }
+            } catch(e) { console.error("MOVE ERROR:", e); }
         }
 
         function updateUI(list, idx) {
             document.getElementById('up-now').innerText = list[idx].name;
             document.getElementById('ledger-list').innerHTML = list.map((p, i) => `
-                <div class="flex justify-between items-center uppercase ${i === idx ? 'text-blue-400' : 'text-gray-400'}">
+                <div class="flex justify-between items-center ${i === idx ? 'text-blue-400' : 'text-gray-400'}">
                     <span>${i === idx ? '🍺 ' : ''}${p.name}</span>
                     <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-500'}">${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}</span>
                 </div>`).join('');
@@ -101,11 +168,13 @@ const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
             if(!data || data.length === 0) return;
             let g = data[0];
             let takers = g.players.filter(p => p.balance > 0);
+            
             if (takers.length === 0) {
-                document.getElementById('settlement-list').innerHTML = `<div class="bg-gray-900 p-6 rounded-3xl border-2 border-dashed border-gray-800 text-center text-xs uppercase text-gray-500">No Winners Yet.</div>`;
+                document.getElementById('settlement-list').innerHTML = `<div class="bg-gray-900 p-6 rounded-3xl border-2 border-dashed border-gray-800 text-center text-xs text-gray-500">NO WINNERS YET. HIT "FORCE POT WIN" TO TEST.</div>`;
                 document.getElementById('settlement-area').classList.remove('hidden');
                 return;
             }
+            
             let givers = g.players.filter(p => p.balance < 0).map(p => ({ n: p.name, a: Math.abs(p.balance) }));
             let tks = takers.map(p => ({ n: p.name, a: p.balance }));
             let txs = [], gi=0, ti=0;
@@ -116,8 +185,8 @@ const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
                 if(givers[gi].a < 0.01) gi++; if(tks[ti].a < 0.01) ti++;
             }
             document.getElementById('settlement-list').innerHTML = txs.map(t => `
-                <div class="bg-gray-900 p-6 rounded-3xl border-2 border-gray-800 flex flex-col items-center mb-2">
-                    <div class="flex justify-between w-full font-black uppercase italic text-sm"><span class="text-red-500">${t.f}</span><span class="text-white text-2xl">$${t.a}</span><span class="text-green-500">${t.t}</span></div>
+                <div class="bg-gray-900 p-6 rounded-3xl border-2 border-gray-800 flex flex-col items-center mb-2 shadow-inner">
+                    <div class="flex justify-between w-full font-black italic text-sm"><span class="text-red-500">${t.f}</span><span class="text-white text-2xl tabular-nums">$${t.a}</span><span class="text-green-500">${t.t}</span></div>
                     <div class="text-[9px] font-black text-gray-500 tracking-[0.4em]">PAYS</div>
                 </div>`).join('');
             document.getElementById('settlement-area').classList.remove('hidden');
@@ -125,5 +194,8 @@ const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         }
 
         function copyShareLink(btn) {
-            navigator.clipboard.writeText(window.location.origin + "/index.html?id=" + r_id).then(() => { btn.innerText = "COPIED!"; setTimeout(() => btn.innerText = "🔗 Scoreboard Link", 2000); });
+            navigator.clipboard.writeText(window.location.origin + "/index.html?id=" + r_id).then(() => { btn.innerText = "COPIED!"; setTimeout(() => btn.innerText = "🔗 SCOREBOARD LINK", 2000); });
         }
+    </script>
+</body>
+</html>

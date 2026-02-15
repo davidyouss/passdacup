@@ -15,12 +15,12 @@ function addPlayer() {
     }
 }
 
-// 2. DRAW INITIAL LINEUP LIST
+// 2. DRAW INITIAL LINEUP LIST (PRE-GAME)
 function draw() {
     document.getElementById('p-list').innerHTML = roster.map((p, i) => `
         <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800">
             <span>${p.name}</span>
-            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 px-2 text-lg">X</button>
+            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 px-2">X</button>
         </div>
     `).join('');
 }
@@ -73,15 +73,12 @@ async function startGame() {
     if (selectedGamePk) setInterval(checkMLB, 15000);
 }
 
-// 5. POLL MLB FEED
+// 5. POLL MLB FEED (HISTORICAL REPLAY)
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
         const data = await resp.json();
         if (!data || !data.allPlays) return;
-
-        // Playback logic: start from beginning if first run
-        if (lastIdx === -1) { lastIdx = -1; } 
 
         const nextIdx = lastIdx + 1;
         if (data.allPlays[nextIdx]) {
@@ -100,7 +97,7 @@ async function checkMLB() {
 // 6. PROCESS MATH & UPDATE DB
 async function processMove(type, desc) {
     try {
-        // Re-fetch to prevent stale balance data
+        // Re-fetch current state to prevent stale data
         let { data, error } = await sb.from('games').select('*').eq('id', r_id);
         if (error || !data || data.length === 0) return;
         
@@ -110,7 +107,7 @@ async function processMove(type, desc) {
         let i = g.current_holder_index;
         let u = parseFloat(document.getElementById('base-bet').value);
 
-        // Scoreboard logic
+        // Scoring Logic
         if (type.includes('strikeout')) { 
             pot += (u * 2); 
             list[i].balance -= (u * 2); 
@@ -128,7 +125,7 @@ async function processMove(type, desc) {
 
         let next_i = (i + 1) % list.length;
         
-        // Immediate UI refresh for Manager
+        // Refresh local Manager UI
         updateManagerUI(list, next_i);
 
         // Sync to cloud for Scoreboard
@@ -144,7 +141,7 @@ async function processMove(type, desc) {
     }
 }
 
-// 7. REFRESH MANAGER LEDGER
+// 7. REFRESH MANAGER STANDINGS LEDGER
 function updateManagerUI(list, activeIdx) {
     document.getElementById('up-now').innerText = list[activeIdx].name;
     document.getElementById('ledger-list').innerHTML = list.map((p, i) => `
@@ -157,7 +154,7 @@ function updateManagerUI(list, activeIdx) {
     `).join('');
 }
 
-// 8. FINAL SETTLEMENT MATH
+// 8. FINAL SETTLEMENT CALCULATION
 async function runSettlement() {
     let { data } = await sb.from('games').select('*').eq('id', r_id);
     if (!data || data.length === 0) return;
@@ -167,8 +164,8 @@ async function runSettlement() {
     
     if (takers.length === 0) {
         document.getElementById('settlement-list').innerHTML = `
-            <div class="bg-gray-900 p-6 rounded-3xl border-2 border-dashed border-gray-800 text-center text-xs text-gray-500">
-                NO WINNERS YET. HIT A SINGLE OR HR TO TEST.
+            <div class="bg-gray-900 p-6 rounded-3xl border-2 border-dashed border-gray-800 text-center text-xs text-gray-500 uppercase">
+                NO WINNERS YET. GAME MUST CONTINUE UNTIL A POT IS WON.
             </div>`;
         document.getElementById('settlement-area').classList.remove('hidden');
         return;
@@ -188,13 +185,13 @@ async function runSettlement() {
     }
 
     document.getElementById('settlement-list').innerHTML = txs.map(t => `
-        <div class="bg-gray-900 p-6 rounded-3xl border-2 border-gray-800 flex flex-col items-center mb-2 shadow-inner">
-            <div class="flex justify-between w-full font-black italic text-sm">
+        <div class="bg-gray-900 p-6 rounded-3xl border-2 border-gray-800 flex flex-col items-center mb-2 shadow-inner uppercase font-black">
+            <div class="flex justify-between w-full italic text-sm">
                 <span class="text-red-500">${t.f}</span>
                 <span class="text-white text-2xl tabular-nums">$${t.a}</span>
                 <span class="text-green-500">${t.t}</span>
             </div>
-            <div class="text-[9px] font-black text-gray-500 tracking-[0.4em]">PAYS</div>
+            <div class="text-[9px] text-gray-500 tracking-[0.4em] mt-1">PAYS</div>
         </div>`).join('');
     
     document.getElementById('settlement-area').classList.remove('hidden');

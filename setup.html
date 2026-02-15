@@ -5,35 +5,42 @@ const sb = supabase.createClient(S_URL, S_KEY);
 let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "", unit = 5;
 let pollInterval = null;
 
+console.log("MANAGER SCRIPT LOADED");
+
 // 1. ADD PLAYER
 function addPlayer() {
+    console.log("Attempting to add player...");
     const el = document.getElementById('p-input');
-    if (!el || !el.value) return;
+    if (!el || !el.value) return console.warn("No input found");
+    
     const val = el.value.trim().toUpperCase();
     roster.push({ name: val, balance: 0 });
     el.value = "";
+    console.log("Roster updated:", roster);
     draw();
 }
 
 // 2. DRAW PRE-GAME LIST
 function draw() {
     const listEl = document.getElementById('p-list');
-    if (!listEl) return;
-    listEl.innerHTML = roster.map((p, i) => 
-        `<div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center mb-2">
+    if (!listEl) return console.error("ID 'p-list' not found in HTML");
+    
+    listEl.innerHTML = roster.map((p, i) => `
+        <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center mb-2">
             <span>${p.name}</span>
-            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-black px-2">X</button>
-        </div>`
-    ).join('');
+            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 px-2 font-black">X</button>
+        </div>
+    `).join('');
 }
 
-// 3. FETCH HISTORICAL GAMES (JULY 10, 2025)
+// 3. FETCH HISTORICAL GAMES
 async function findGames(e) {
+    console.log("Fetching games for July 10, 2025...");
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
         const data = await resp.json();
         const select = document.getElementById('game-select');
-        if (!select) return;
+        if (!select) return console.error("ID 'game-select' not found");
         
         select.innerHTML = '<option value="">-- SELECT GAME --</option>';
         data.dates[0].games.forEach(g => {
@@ -44,11 +51,13 @@ async function findGames(e) {
         });
         select.classList.remove('hidden');
         if (e && e.target) e.target.classList.add('hidden');
+        console.log("Games loaded successfully");
     } catch (err) { console.error("API Error:", err); }
 }
 
 // 4. START GAME
 async function startGame() {
+    console.log("Initializing session...");
     if (roster.length < 2) return alert("ADD 2+ PLAYERS!");
     const sel = document.getElementById('game-select');
     if (!sel || !sel.value) return alert("SELECT A GAME!");
@@ -57,7 +66,6 @@ async function startGame() {
     unit = parseFloat(document.getElementById('base-bet').value) || 5; 
     r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
     
-    // Set buy-in debt
     roster.forEach(p => p.balance = -unit);
     
     document.getElementById('setup-area').classList.add('hidden');
@@ -76,8 +84,10 @@ async function startGame() {
     }]);
 
     if (error) return alert("Supabase Error: " + error.message);
+    
+    console.log("Game started! ID:", r_id);
     selectedGamePk = sel.value;
-    pollInterval = setInterval(checkMLB, 15000); // 15s speed
+    pollInterval = setInterval(checkMLB, 15000);
 }
 
 // 5. REPLAY ENGINE
@@ -96,7 +106,7 @@ async function checkMLB() {
             await processMove(event, desc);
             lastIdx = nextIdx;
         }
-    } catch (e) { console.log("Feed check..."); }
+    } catch (e) { console.warn("Polling..."); }
 }
 
 // 6. PROCESS MOVE
@@ -142,7 +152,7 @@ function updateManagerUI(list, activeIdx) {
     if (!ledger) return;
     
     ledger.innerHTML = list.map((p, i) => `
-        <div class="flex justify-between items-center p-1 ${i === activeIdx ? 'text-blue-400 font-bold' : 'text-gray-400'}">
+        <div class="flex justify-between items-center p-2 uppercase ${i === activeIdx ? 'text-blue-400 font-bold' : 'text-gray-400'}">
             <span>${p.name}</span>
             <span>$${p.balance.toFixed(2)}</span>
         </div>

@@ -11,12 +11,12 @@
     <div class="max-w-md mx-auto space-y-6">
         
         <div class="text-center">
-            <h2 id="game-name" class="text-[12px] font-black uppercase text-gray-500 tracking-[0.3em] italic">Loading Game...</h2>
+            <h2 id="game-name" class="text-[12px] font-black uppercase text-gray-500 tracking-[0.3em] italic">CONNECTING...</h2>
         </div>
 
         <div class="bg-gray-900 border border-yellow-500/20 p-4 rounded-2xl text-center shadow-lg">
             <p class="text-[10px] font-black uppercase text-gray-500 mb-1 tracking-widest">Live Feed</p>
-            <div id="pbp-display" class="text-lg font-bold italic text-yellow-500 leading-tight">Waiting for play...</div>
+            <div id="pbp-display" class="text-lg font-bold italic text-yellow-500 leading-tight">Waiting for first pitch...</div>
         </div>
 
         <div class="bg-green-600 p-8 rounded-3xl text-center shadow-2xl border-b-8 border-green-800">
@@ -34,34 +34,49 @@
         const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
-        const gameId = new URLSearchParams(window.location.search).get('id');
         
+        // Grab Game ID from URL (e.g., ?id=ABCD)
+        const gameId = new URLSearchParams(window.location.search).get('id');
+
         async function instantSync() {
-            if (!gameId) return;
+            if (!gameId) {
+                document.getElementById('game-name').innerText = "NO GAME ID FOUND";
+                return;
+            }
             try {
-                // Use the array-fetch method to avoid 406 Not Acceptable errors
+                // FIXED FETCH: Using array selection to match Manager and avoid 406 errors
                 const { data, error } = await sb.from('games').select('*').eq('id', gameId);
                 
                 if (data && data.length > 0) {
                     const game = data[0];
-                    document.getElementById('game-name').innerText = game.game_name || "Pass Da Cup Live";
-                    document.getElementById('pot').innerText = `$${parseFloat(game.pot_total).toFixed(2)}`;
-                    document.getElementById('pbp-display').innerText = game.last_event || "Play Ball!";
                     
+                    // Update Game Header
+                    document.getElementById('game-name').innerText = game.game_name || "LIVE SESSION";
+                    
+                    // Update Pot and Ticker
+                    document.getElementById('pot').innerText = `$${parseFloat(game.pot_total).toFixed(2)}`;
+                    document.getElementById('pbp-display').innerText = game.last_event || "PLAY BALL!";
+                    
+                    // Update Players and Active Beer Icon
                     document.getElementById('player-list').innerHTML = game.players.map((p, i) => `
                         <div class="flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-200 ${i === game.current_holder_index ? 'bg-blue-600 border-blue-400 scale-105 shadow-xl' : 'bg-gray-900 border-gray-800 opacity-60'}">
-                            <span class="font-black uppercase italic text-lg">${i === game.current_holder_index ? '🍺 ' : ''}${p.name}</span>
+                            <span class="font-black uppercase italic text-lg text-white">
+                                ${i === game.current_holder_index ? '🍺 ' : ''}${p.name}
+                            </span>
                             <span class="font-mono font-bold ${p.balance < 0 ? 'text-red-400' : 'text-green-400'}">
                                 ${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}
                             </span>
                         </div>
                     `).join('');
-        
+
                     document.getElementById('sync-time').innerText = `Live Sync: ${new Date().toLocaleTimeString()}`;
                 }
-            } catch (e) { console.log("Sync check..."); }
+            } catch (e) {
+                console.log("Check connection...");
+            }
         }
 
+        // Start 1-second high-speed polling
         if (gameId) {
             instantSync();
             setInterval(instantSync, 1000); 

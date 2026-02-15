@@ -1,3 +1,8 @@
+// Ensure script runs after HTML loads
+window.onload = () => {
+    console.log("Manager System Ready. Session ID:", Math.random().toString(36).substring(7));
+};
+
 const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
 const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
 const sb = supabase.createClient(S_URL, S_KEY);
@@ -5,7 +10,7 @@ const sb = supabase.createClient(S_URL, S_KEY);
 let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "", unit = 5;
 let pollInterval = null;
 
-// ADD PLAYER
+// 1. ADD PLAYER
 function addPlayer() {
     const el = document.getElementById('p-input');
     if (!el || !el.value) return;
@@ -15,25 +20,26 @@ function addPlayer() {
     draw();
 }
 
-// DRAW PRE-GAME LIST
+// 2. DRAW PRE-GAME LIST (Fixed with Tags)
 function draw() {
     const listEl = document.getElementById('p-list');
     if (!listEl) return;
     listEl.innerHTML = roster.map((p, i) => `
-        <div style="background:#111; padding:10px; margin-bottom:5px; display:flex; justify-content:space-between;">
+        <div class="flex justify-between bg-gray-800 p-2 mb-1 rounded">
             <span>${p.name}</span>
-            <button onclick="roster.splice(${i},1);draw()" style="color:red;">X</button>
+            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-bold">X</button>
         </div>
     `).join('');
 }
 
-// FETCH JULY 10, 2025 GAMES
+// 3. FETCH GAMES
 async function findGames(e) {
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
         const data = await resp.json();
         const select = document.getElementById('game-select');
         if (!select) return;
+        
         select.innerHTML = '<option value="">-- SELECT GAME --</option>';
         data.dates[0].games.forEach(g => {
             let opt = document.createElement('option');
@@ -46,7 +52,7 @@ async function findGames(e) {
     } catch (err) { console.error("API Error:", err); }
 }
 
-// START GAME
+// 4. START GAME
 async function startGame() {
     if (roster.length < 2) return alert("ADD 2+ PLAYERS!");
     const sel = document.getElementById('game-select');
@@ -56,6 +62,7 @@ async function startGame() {
     unit = parseFloat(document.getElementById('base-bet').value) || 5; 
     r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
     
+    // Set initial buy-in debt
     roster.forEach(p => p.balance = -unit);
     
     document.getElementById('setup-area').classList.add('hidden');
@@ -65,8 +72,12 @@ async function startGame() {
     updateManagerUI(roster, 0);
 
     const { error } = await sb.from('games').insert([{ 
-        id: r_id, players: roster, pot_total: (unit * roster.length), 
-        current_holder_index: 0, last_event: "PLAY BALL!", game_name: gameName 
+        id: r_id, 
+        players: roster, 
+        pot_total: (unit * roster.length), 
+        current_holder_index: 0, 
+        last_event: "PLAY BALL!", 
+        game_name: gameName 
     }]);
 
     if (error) return alert("Supabase Error: " + error.message);
@@ -74,7 +85,7 @@ async function startGame() {
     pollInterval = setInterval(checkMLB, 10000); // 10s speed
 }
 
-// REPLAY ENGINE
+// 5. REPLAY ENGINE
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
@@ -93,7 +104,7 @@ async function checkMLB() {
     } catch (e) { console.log("Feed check..."); }
 }
 
-// PROCESS MOVE
+// 6. PROCESS MOVE
 async function processMove(type, desc) {
     const { data } = await sb.from('games').select('*').eq('id', r_id);
     if (!data || !data[0]) return;
@@ -101,23 +112,42 @@ async function processMove(type, desc) {
     const g = data[0];
     let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index;
 
-    if (type.includes('strikeout')) { pot += (unit * 2); list[i].balance -= (unit * 2); }
-    else if (type.includes('out')) { pot += unit; list[i].balance -= unit; }
-    else if (type.includes('single')) { let win = Math.min(pot, unit); pot -= win; list[i].balance += win; }
-    else if (type.includes('home_run')) { list[i].balance += pot; pot = 0; }
+    if (type.includes('strikeout')) { 
+        pot += (unit * 2); 
+        list[i].balance -= (unit * 2); 
+    } else if (type.includes('out')) { 
+        pot += unit; 
+        list[i].balance -= unit; 
+    } else if (type.includes('single')) { 
+        let win = Math.min(pot, unit); 
+        pot -= win; 
+        list[i].balance += win; 
+    } else if (type.includes('home_run')) { 
+        list[i].balance += pot; 
+        pot = 0; 
+    }
 
     let next_i = (i + 1) % list.length;
     updateManagerUI(list, next_i);
-    await sb.from('games').update({ pot_total: pot, players: list, current_holder_index: next_i, last_event: desc }).eq('id', r_id);
+    
+    await sb.from('games').update({ 
+        pot_total: pot, 
+        players: list, 
+        current_holder_index: next_i, 
+        last_event: desc 
+    }).eq('id', r_id);
 }
 
-// UI REFRESH
+// 7. UI REFRESH (Fixed HTML Structure)
 function updateManagerUI(list, activeIdx) {
-    document.getElementById('up-now').innerText = list[activeIdx].name;
+    const upNowEl = document.getElementById('up-now');
+    if (upNowEl) upNowEl.innerText = list[activeIdx].name;
+    
     const ledger = document.getElementById('ledger-list');
     if (!ledger) return;
+    
     ledger.innerHTML = list.map((p, i) => `
-        <div style="display:flex; justify-content:space-between; color:${i === activeIdx ? '#60A5FA' : '#9CA3AF'}">
+        <div class="flex justify-between items-center p-1 ${i === activeIdx ? 'text-blue-400 font-bold' : 'text-gray-400'}">
             <span>${p.name}</span>
             <span>$${p.balance.toFixed(2)}</span>
         </div>

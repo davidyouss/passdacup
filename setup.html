@@ -4,7 +4,7 @@ const sb = supabase.createClient(S_URL, S_KEY);
 
 let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "", unit = 5;
 
-// 1. ADD PLAYER
+// 1. ADD PLAYER TO PRE-GAME LIST
 function addPlayer() {
     const el = document.getElementById('p-input');
     const val = el.value.trim().toUpperCase();
@@ -15,18 +15,18 @@ function addPlayer() {
     }
 }
 
-// 2. DRAW LINEUP (Fixed HTML Strings)
+// 2. RENDER THE PRE-GAME LINEUP
 function draw() {
     const listEl = document.getElementById('p-list');
-    listEl.innerHTML = roster.map((p, i) => `
-        <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center mb-2">
+    listEl.innerHTML = roster.map((p, i) => 
+        `<div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center mb-2">
             <span>${p.name}</span>
             <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-black px-2">X</button>
-        </div>
-    `).join('');
+        </div>`
+    ).join('');
 }
 
-// 3. FETCH GAMES
+// 3. FETCH HISTORICAL GAMES (JULY 10, 2025)
 async function findGames(e) {
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
@@ -46,7 +46,7 @@ async function findGames(e) {
     } catch (err) { console.error("Fetch Error:", err); }
 }
 
-// 4. START GAME
+// 4. INITIALIZE THE LIVE SESSION
 async function startGame() {
     if (roster.length < 2) return alert("ADD 2+ PLAYERS!");
     const sel = document.getElementById('game-select');
@@ -56,6 +56,7 @@ async function startGame() {
     unit = parseFloat(document.getElementById('base-bet').value); 
     r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
     
+    // Set buy-in debt
     roster.forEach(p => p.balance = -unit);
 
     document.getElementById('setup-area').classList.add('hidden');
@@ -64,6 +65,7 @@ async function startGame() {
     
     updateManagerUI(roster, 0);
 
+    // Initial Database Push
     await sb.from('games').insert([{ 
         id: r_id, 
         players: roster, 
@@ -74,10 +76,10 @@ async function startGame() {
     }]);
 
     selectedGamePk = sel.value;
-    setInterval(checkMLB, 15000);
+    setInterval(checkMLB, 15000); // 15s refresh cycle
 }
 
-// 5. CHECK MLB (Historical Replay)
+// 5. POLL MLB API FOR NEXT PLAY
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
@@ -99,9 +101,10 @@ async function checkMLB() {
     } catch (e) { console.error("Feed Error:", e); }
 }
 
-// 6. PROCESS MOVE
+// 6. CALCULATE BALANCES & SYNC SUPABASE
 async function processMove(type, desc) {
     try {
+        // Fetch current state to avoid 406 error and stale data
         const { data, error } = await sb.from('games').select('*').eq('id', r_id);
         if (error || !data || data.length === 0) return;
         
@@ -116,8 +119,11 @@ async function processMove(type, desc) {
         else if (type.includes('hr')) { list[i].balance += pot; pot = 0; }
 
         let next_i = (i + 1) % list.length;
+        
+        // Immediate UI refresh for Manager
         updateManagerUI(list, next_i);
 
+        // Update Cloud
         await sb.from('games').update({ 
             pot_total: pot, 
             players: list, 
@@ -127,21 +133,21 @@ async function processMove(type, desc) {
     } catch (e) { console.error("Move Error:", e); }
 }
 
-// 7. UI REFRESH
+// 7. REFRESH MANAGER STANDINGS LEDGER
 function updateManagerUI(list, activeIdx) {
     document.getElementById('up-now').innerText = list[activeIdx].name;
     const ledger = document.getElementById('ledger-list');
-    ledger.innerHTML = list.map((p, i) => `
-        <div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400 font-black' : 'text-gray-400'} mb-2">
+    ledger.innerHTML = list.map((p, i) => 
+        `<div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400 font-black' : 'text-gray-400'} mb-2">
             <span>${i === activeIdx ? '🍺 ' : ''}${p.name}</span>
             <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-500'} font-mono">
                 ${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}
             </span>
-        </div>
-    `).join('');
+        </div>`
+    ).join('');
 }
 
-// 8. SETTLEMENT
+// 8. GENERATE FINAL SETTLEMENT CARDS
 async function runSettlement() {
     const { data } = await sb.from('games').select('*').eq('id', r_id);
     if (!data || data.length === 0) return;
@@ -149,9 +155,9 @@ async function runSettlement() {
     const takers = g.players.filter(p => p.balance > 0);
     
     if (takers.length === 0) {
-        document.getElementById('settlement-list').innerHTML = `
-            <div class="p-4 text-center text-xs text-gray-500 border border-dashed border-gray-800 rounded-xl uppercase">
-                NO WINNERS YET. HIT A HR TO TEST.
+        document.getElementById('settlement-list').innerHTML = 
+            `<div class="p-4 text-center text-xs text-gray-500 border border-dashed border-gray-800 rounded-xl uppercase">
+                NO WINNERS YET. NEED AT LEAST ONE PERSON IN THE GREEN.
             </div>`;
         document.getElementById('settlement-area').classList.remove('hidden');
         return;
@@ -169,7 +175,7 @@ async function runSettlement() {
     }
 
     document.getElementById('settlement-list').innerHTML = txs.map(t => `
-        <div class="bg-gray-900 p-5 rounded-3xl border-2 border-gray-800 flex flex-col items-center mb-2 shadow-inner font-black uppercase">
+        <div class="bg-gray-900 p-5 rounded-3xl border-2 border-gray-800 flex flex-col items-center mb-2 shadow-inner uppercase font-black">
             <div class="flex justify-between w-full italic text-sm">
                 <span class="text-red-500">${t.f}</span>
                 <span class="text-white text-2xl tabular-nums">$${t.a}</span>
@@ -177,11 +183,12 @@ async function runSettlement() {
             </div>
             <div class="text-[9px] text-gray-500 tracking-[0.4em] mt-1">PAYS</div>
         </div>`).join('');
+    
     document.getElementById('settlement-area').classList.remove('hidden');
     document.getElementById('manager-controls').classList.add('hidden');
 }
 
-// 9. SHARE
+// 9. COPY SHARE LINK TO CLIPBOARD
 function copyShareLink(btn) {
     const url = window.location.origin + window.location.pathname.replace('setup.html', 'index.html') + "?id=" + r_id;
     navigator.clipboard.writeText(url).then(() => {

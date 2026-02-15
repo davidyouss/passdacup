@@ -1,3 +1,4 @@
+// 1. GLOBAL CONFIG
 const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
 const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
 const sb = supabase.createClient(S_URL, S_KEY);
@@ -5,42 +6,43 @@ const sb = supabase.createClient(S_URL, S_KEY);
 let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "", unit = 5;
 let pollInterval = null;
 
-console.log("MANAGER SCRIPT LOADED");
+console.log("MANAGER SYSTEM INITIALIZED");
 
-// 1. ADD PLAYER
-function addPlayer() {
-    console.log("Attempting to add player...");
+// 2. ERROR CATCHER (If this doesn't show an alert on error, your script isn't loading at all)
+window.onerror = function(msg, url, line) {
+    alert("CRITICAL ERROR: " + msg + "\nLine: " + line);
+    return false;
+};
+
+// 3. ADD PLAYER
+window.addPlayer = function() {
     const el = document.getElementById('p-input');
-    if (!el || !el.value) return console.warn("No input found");
-    
+    if (!el || !el.value) return;
     const val = el.value.trim().toUpperCase();
     roster.push({ name: val, balance: 0 });
     el.value = "";
-    console.log("Roster updated:", roster);
     draw();
-}
+};
 
-// 2. DRAW PRE-GAME LIST
-function draw() {
+// 4. DRAW LINEUP
+window.draw = function() {
     const listEl = document.getElementById('p-list');
-    if (!listEl) return console.error("ID 'p-list' not found in HTML");
-    
+    if (!listEl) return;
     listEl.innerHTML = roster.map((p, i) => `
-        <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center mb-2">
+        <div class="flex justify-between p-2 mb-1 bg-gray-800 rounded border border-gray-700">
             <span>${p.name}</span>
-            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 px-2 font-black">X</button>
+            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-bold">X</button>
         </div>
     `).join('');
-}
+};
 
-// 3. FETCH HISTORICAL GAMES
-async function findGames(e) {
-    console.log("Fetching games for July 10, 2025...");
+// 5. FETCH GAMES
+window.findGames = async function(e) {
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
         const data = await resp.json();
         const select = document.getElementById('game-select');
-        if (!select) return console.error("ID 'game-select' not found");
+        if (!select) return;
         
         select.innerHTML = '<option value="">-- SELECT GAME --</option>';
         data.dates[0].games.forEach(g => {
@@ -51,13 +53,11 @@ async function findGames(e) {
         });
         select.classList.remove('hidden');
         if (e && e.target) e.target.classList.add('hidden');
-        console.log("Games loaded successfully");
-    } catch (err) { console.error("API Error:", err); }
-}
+    } catch (err) { console.error("Game Fetch Error:", err); }
+};
 
-// 4. START GAME
-async function startGame() {
-    console.log("Initializing session...");
+// 6. START GAME
+window.startGame = async function() {
     if (roster.length < 2) return alert("ADD 2+ PLAYERS!");
     const sel = document.getElementById('game-select');
     if (!sel || !sel.value) return alert("SELECT A GAME!");
@@ -84,13 +84,11 @@ async function startGame() {
     }]);
 
     if (error) return alert("Supabase Error: " + error.message);
-    
-    console.log("Game started! ID:", r_id);
     selectedGamePk = sel.value;
     pollInterval = setInterval(checkMLB, 15000);
-}
+};
 
-// 5. REPLAY ENGINE
+// 7. REPLAY ENGINE
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
@@ -106,10 +104,10 @@ async function checkMLB() {
             await processMove(event, desc);
             lastIdx = nextIdx;
         }
-    } catch (e) { console.warn("Polling..."); }
+    } catch (e) { console.log("Polling for updates..."); }
 }
 
-// 6. PROCESS MOVE
+// 8. PROCESS MOVE
 async function processMove(type, desc) {
     const { data } = await sb.from('games').select('*').eq('id', r_id);
     if (!data || !data[0]) return;
@@ -117,20 +115,10 @@ async function processMove(type, desc) {
     const g = data[0];
     let pot = parseFloat(g.pot_total), list = g.players, i = g.current_holder_index;
 
-    if (type.includes('strikeout')) { 
-        pot += (unit * 2); 
-        list[i].balance -= (unit * 2); 
-    } else if (type.includes('out')) { 
-        pot += unit; 
-        list[i].balance -= unit; 
-    } else if (type.includes('single')) { 
-        let win = Math.min(pot, unit); 
-        pot -= win; 
-        list[i].balance += win; 
-    } else if (type.includes('home_run')) { 
-        list[i].balance += pot; 
-        pot = 0; 
-    }
+    if (type.includes('strikeout')) { pot += (unit * 2); list[i].balance -= (unit * 2); }
+    else if (type.includes('out')) { pot += unit; list[i].balance -= unit; }
+    else if (type.includes('single')) { let win = Math.min(pot, unit); pot -= win; list[i].balance += win; }
+    else if (type.includes('home_run')) { list[i].balance += pot; pot = 0; }
 
     let next_i = (i + 1) % list.length;
     updateManagerUI(list, next_i);
@@ -143,16 +131,14 @@ async function processMove(type, desc) {
     }).eq('id', r_id);
 }
 
-// 7. UI REFRESH
+// 9. UI REFRESH
 function updateManagerUI(list, activeIdx) {
     const upNowEl = document.getElementById('up-now');
     if (upNowEl) upNowEl.innerText = list[activeIdx].name;
-    
     const ledger = document.getElementById('ledger-list');
     if (!ledger) return;
-    
     ledger.innerHTML = list.map((p, i) => `
-        <div class="flex justify-between items-center p-2 uppercase ${i === activeIdx ? 'text-blue-400 font-bold' : 'text-gray-400'}">
+        <div class="flex justify-between p-1 ${i === activeIdx ? 'text-blue-400 font-bold' : 'text-gray-400'}">
             <span>${p.name}</span>
             <span>$${p.balance.toFixed(2)}</span>
         </div>

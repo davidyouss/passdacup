@@ -1,8 +1,3 @@
-// Ensure script runs after HTML loads
-window.onload = () => {
-    console.log("Manager System Ready. Session ID:", Math.random().toString(36).substring(7));
-};
-
 const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
 const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
 const sb = supabase.createClient(S_URL, S_KEY);
@@ -20,19 +15,19 @@ function addPlayer() {
     draw();
 }
 
-// 2. DRAW PRE-GAME LIST (Fixed with Tags)
+// 2. DRAW PRE-GAME LIST
 function draw() {
     const listEl = document.getElementById('p-list');
     if (!listEl) return;
-    listEl.innerHTML = roster.map((p, i) => `
-        <div class="flex justify-between bg-gray-800 p-2 mb-1 rounded">
+    listEl.innerHTML = roster.map((p, i) => 
+        `<div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center mb-2">
             <span>${p.name}</span>
-            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-bold">X</button>
-        </div>
-    `).join('');
+            <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-black px-2">X</button>
+        </div>`
+    ).join('');
 }
 
-// 3. FETCH GAMES
+// 3. FETCH HISTORICAL GAMES (JULY 10, 2025)
 async function findGames(e) {
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
@@ -62,7 +57,7 @@ async function startGame() {
     unit = parseFloat(document.getElementById('base-bet').value) || 5; 
     r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
     
-    // Set initial buy-in debt
+    // Set buy-in debt
     roster.forEach(p => p.balance = -unit);
     
     document.getElementById('setup-area').classList.add('hidden');
@@ -82,7 +77,7 @@ async function startGame() {
 
     if (error) return alert("Supabase Error: " + error.message);
     selectedGamePk = sel.value;
-    pollInterval = setInterval(checkMLB, 10000); // 10s speed
+    pollInterval = setInterval(checkMLB, 15000); // 15s speed
 }
 
 // 5. REPLAY ENGINE
@@ -138,7 +133,7 @@ async function processMove(type, desc) {
     }).eq('id', r_id);
 }
 
-// 7. UI REFRESH (Fixed HTML Structure)
+// 7. UI REFRESH
 function updateManagerUI(list, activeIdx) {
     const upNowEl = document.getElementById('up-now');
     if (upNowEl) upNowEl.innerText = list[activeIdx].name;

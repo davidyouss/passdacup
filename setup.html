@@ -16,7 +16,7 @@ function addPlayer() {
     }
 }
 
-// 2. DRAW PRE-GAME LIST (Fixed HTML Injection)
+// 2. DRAW PRE-GAME LIST
 function draw() {
     const listEl = document.getElementById('p-list');
     listEl.innerHTML = roster.map((p, i) => 
@@ -27,7 +27,7 @@ function draw() {
     ).join('');
 }
 
-// 3. FETCH HISTORICAL GAMES
+// 3. FETCH HISTORICAL GAMES (JULY 10, 2025)
 async function findGames(e) {
     try {
         const resp = await fetch('https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=2025-07-10');
@@ -80,7 +80,7 @@ async function startGame() {
     pollInterval = setInterval(checkMLB, 15000);
 }
 
-// 5. REPLAY ENGINE
+// 5. THE REPLAY ENGINE
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
@@ -91,7 +91,7 @@ async function checkMLB() {
         if (nextIdx < data.allPlays.length) {
             const play = data.allPlays[nextIdx];
             const eventType = play.result.event ? play.result.event.toLowerCase() : "";
-            const desc = play.result.description || "Next batter up...";
+            const desc = play.result.description || "In progress...";
             
             document.getElementById('pbp-text').innerText = desc;
             document.getElementById('replay-status').innerText = `PLAY ${nextIdx + 1} OF ${data.allPlays.length}`;
@@ -144,7 +144,7 @@ async function processMove(type, desc) {
     } catch (e) { console.error("Move Error:", e); }
 }
 
-// 7. UI REFRESH (Fixed map formatting)
+// 7. UI REFRESH
 function updateManagerUI(list, activeIdx) {
     document.getElementById('up-now').innerText = list[activeIdx].name;
     const ledger = document.getElementById('ledger-list');

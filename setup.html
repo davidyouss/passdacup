@@ -2,7 +2,7 @@ const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
 const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
 const sb = supabase.createClient(S_URL, S_KEY);
 
-let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "";
+let roster = [], r_id = "", selectedGamePk = null, lastIdx = -1, gameName = "", unit = 5;
 
 // 1. ADD PLAYER
 function addPlayer() {
@@ -15,10 +15,11 @@ function addPlayer() {
     }
 }
 
-// 2. DRAW LINEUP (Fixed Template Literals)
+// 2. DRAW LINEUP (Cleaned Template)
 function draw() {
-    document.getElementById('p-list').innerHTML = roster.map((p, i) => `
-        <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center">
+    const listEl = document.getElementById('p-list');
+    listEl.innerHTML = roster.map((p, i) => `
+        <div class="bg-gray-900 p-3 rounded flex justify-between text-xs font-bold uppercase border border-gray-800 items-center mb-2">
             <span>${p.name}</span>
             <button onclick="roster.splice(${i},1);draw()" class="text-red-500 font-black px-2">X</button>
         </div>
@@ -32,25 +33,27 @@ async function findGames(e) {
         const data = await resp.json();
         const select = document.getElementById('game-select');
         select.innerHTML = '<option value="">-- SELECT GAME --</option>';
-        data.dates[0].games.forEach(g => {
-            let opt = document.createElement('option');
-            opt.value = g.gamePk;
-            opt.text = `${g.teams.away.team.name.toUpperCase()} @ ${g.teams.home.team.name.toUpperCase()}`;
-            select.appendChild(opt);
-        });
-        select.classList.remove('hidden');
-        e.target.classList.add('hidden');
-    } catch (err) { console.error("Game fetch failed", err); }
+        if (data.dates && data.dates[0]) {
+            data.dates[0].games.forEach(g => {
+                let opt = document.createElement('option');
+                opt.value = g.gamePk;
+                opt.text = `${g.teams.away.team.name.toUpperCase()} @ ${g.teams.home.team.name.toUpperCase()}`;
+                select.appendChild(opt);
+            });
+            select.classList.remove('hidden');
+            e.target.classList.add('hidden');
+        }
+    } catch (err) { console.error("Fetch Error:", err); }
 }
 
 // 4. START GAME
 async function startGame() {
     if (roster.length < 2) return alert("ADD 2+ PLAYERS!");
     const sel = document.getElementById('game-select');
-    if (!sel.value) return alert("SELECT A GAME FIRST!");
+    if (!sel.value) return alert("SELECT A GAME!");
 
     gameName = sel.options[sel.selectedIndex].text;
-    const unit = parseFloat(document.getElementById('base-bet').value);
+    unit = parseFloat(document.getElementById('base-bet').value); // Global assignment
     r_id = Math.random().toString(36).substring(2, 6).toUpperCase();
     
     roster.forEach(p => p.balance = -unit);
@@ -74,7 +77,7 @@ async function startGame() {
     setInterval(checkMLB, 15000);
 }
 
-// 5. CHECK MLB (Sequential Replay)
+// 5. CHECK MLB (Logic Fix)
 async function checkMLB() {
     try {
         const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${selectedGamePk}/playByPlay`);
@@ -84,29 +87,32 @@ async function checkMLB() {
         const nextIdx = lastIdx + 1;
         if (data.allPlays[nextIdx]) {
             const play = data.allPlays[nextIdx];
-            document.getElementById('pbp-text').innerText = play.result.description;
+            const desc = play.result.description;
+            const eventType = play.result.event.toLowerCase();
+            
+            document.getElementById('pbp-text').innerText = desc;
             document.getElementById('replay-status').innerText = `PLAY #${nextIdx + 1} OF ${data.allPlays.length}`;
-            await processMove(play.result.event.toLowerCase(), play.result.description);
+            
+            await processMove(eventType, desc);
             lastIdx = nextIdx;
         }
-    } catch (e) { console.error("FEED ERROR:", e); }
+    } catch (e) { console.error("Feed Error:", e); }
 }
 
-// 6. PROCESS MOVE (State Persistence)
+// 6. PROCESS MOVE (Refined Calculation)
 async function processMove(type, desc) {
     try {
-        let { data, error } = await sb.from('games').select('*').eq('id', r_id);
+        const { data, error } = await sb.from('games').select('*').eq('id', r_id);
         if (error || !data || data.length === 0) return;
         
-        let g = data[0];
+        const g = data[0];
         let pot = parseFloat(g.pot_total);
         let list = g.players;
         let i = g.current_holder_index;
-        let u = parseFloat(document.getElementById('base-bet').value);
 
-        if (type.includes('strikeout')) { pot += (u * 2); list[i].balance -= (u * 2); } 
-        else if (type.includes('out')) { pot += u; list[i].balance -= u; } 
-        else if (type.includes('single')) { let win = Math.min(pot, u); pot -= win; list[i].balance += win; } 
+        if (type.includes('strikeout')) { pot += (unit * 2); list[i].balance -= (unit * 2); } 
+        else if (type.includes('out')) { pot += unit; list[i].balance -= unit; } 
+        else if (type.includes('single')) { let win = Math.min(pot, unit); pot -= win; list[i].balance += win; } 
         else if (type.includes('hr')) { list[i].balance += pot; pot = 0; }
 
         let next_i = (i + 1) % list.length;
@@ -118,14 +124,15 @@ async function processMove(type, desc) {
             current_holder_index: next_i, 
             last_event: desc 
         }).eq('id', r_id);
-    } catch (e) { console.error("MOVE ERROR:", e); }
+    } catch (e) { console.error("Move Error:", e); }
 }
 
-// 7. UI REFRESH (Fixed HTML)
+// 7. UI REFRESH (Robust HTML)
 function updateManagerUI(list, activeIdx) {
     document.getElementById('up-now').innerText = list[activeIdx].name;
-    document.getElementById('ledger-list').innerHTML = list.map((p, i) => `
-        <div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400 font-bold' : 'text-gray-400'}">
+    const ledger = document.getElementById('ledger-list');
+    ledger.innerHTML = list.map((p, i) => `
+        <div class="flex justify-between items-center uppercase ${i === activeIdx ? 'text-blue-400 font-bold' : 'text-gray-400'} mb-1">
             <span>${i === activeIdx ? '🍺 ' : ''}${p.name}</span>
             <span class="${p.balance < 0 ? 'text-red-500' : 'text-green-500'} font-mono">
                 ${p.balance < 0 ? '-' : ''}$${Math.abs(p.balance).toFixed(2)}
@@ -136,10 +143,10 @@ function updateManagerUI(list, activeIdx) {
 
 // 8. SETTLEMENT
 async function runSettlement() {
-    let { data } = await sb.from('games').select('*').eq('id', r_id);
+    const { data } = await sb.from('games').select('*').eq('id', r_id);
     if (!data || data.length === 0) return;
-    let g = data[0];
-    let takers = g.players.filter(p => p.balance > 0);
+    const g = data[0];
+    const takers = g.players.filter(p => p.balance > 0);
     
     if (takers.length === 0) {
         document.getElementById('settlement-list').innerHTML = `<div class="p-4 text-center text-xs text-gray-500 border border-dashed border-gray-800 rounded-xl">NO WINNERS YET.</div>`;
@@ -147,8 +154,8 @@ async function runSettlement() {
         return;
     }
     
-    let givers = g.players.filter(p => p.balance < 0).map(p => ({ n: p.name, a: Math.abs(p.balance) }));
-    let tks = takers.map(p => ({ n: p.name, a: p.balance }));
+    const givers = g.players.filter(p => p.balance < 0).map(p => ({ n: p.name, a: Math.abs(p.balance) }));
+    const tks = takers.map(p => ({ n: p.name, a: p.balance }));
     let txs = [], gi = 0, ti = 0;
 
     while (gi < givers.length && ti < tks.length) {
@@ -165,12 +172,12 @@ async function runSettlement() {
                 <span class="text-white text-xl">$${t.a}</span>
                 <span class="text-green-500">${t.t}</span>
             </div>
-            <div class="text-[9px] text-gray-500 tracking-[0.4em] mt-1">PAYS</div>
+            <div class="text-[9px] text-gray-500 tracking-[0.4em] mt-1 uppercase">PAYS</div>
         </div>`).join('');
     document.getElementById('settlement-area').classList.remove('hidden');
 }
 
-// 9. SHARE LINK
+// 9. SHARE
 function copyShareLink(btn) {
     const url = window.location.origin + window.location.pathname.replace('setup.html', 'index.html') + "?id=" + r_id;
     navigator.clipboard.writeText(url).then(() => {

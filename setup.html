@@ -169,9 +169,9 @@
         window.pollInterval = null;
         window.currentPot = 0;
         
-        // Date configuration - auto-detect
+        // Date configuration - Use 7/10/2025 until 2/20/2026, then switch to current date
         const TEST_DATE = '2025-07-10';
-        const SPRING_TRAINING_START = new Date('2025-02-20');
+        const SPRING_TRAINING_START = new Date('2026-02-20T00:00:00');
         
         console.log("MANAGER SYSTEM BOOTED");
 
@@ -197,15 +197,15 @@
             ).join('');
         };
 
-        // 4. FETCH GAMES (AUTO-DETECT DATE)
+        // 4. FETCH GAMES - Use 7/10/2025 until 2/20/2026, then switch to live
         window.findGames = async function(e) {
             try {
-                // Auto-detect: use test date if before spring training, otherwise use today
+                // Use test date until Feb 20, 2026, then switch to current date
                 const now = new Date();
                 const today = new Date().toISOString().split('T')[0];
                 const fetchDate = (now < SPRING_TRAINING_START) ? TEST_DATE : today;
                 
-                console.log(`Fetching games for ${fetchDate}`);
+                console.log(`Fetching games for ${fetchDate} (Spring training starts: ${SPRING_TRAINING_START.toLocaleDateString()})`);
                 
                 const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${fetchDate}`);
                 const data = await resp.json();
@@ -278,7 +278,8 @@
                 players: window.roster,
                 pot_total: window.currentPot,
                 current_holder_index: 0,
-                last_event: "PLAY BALL!"
+                last_event: "PLAY BALL!",
+                game_name: window.gameName
             }]);
             
             if (error) {

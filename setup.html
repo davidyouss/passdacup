@@ -71,27 +71,6 @@
                 />
             </div>
 
-            <!-- TEST MODE TOGGLE -->
-            <div class="mb-4 p-3 sm:p-4 bg-gray-950 rounded-xl border border-gray-700">
-                <label class="flex items-center cursor-pointer">
-                    <input 
-                        type="checkbox" 
-                        id="test-mode" 
-                        class="w-5 h-5 mr-3 flex-shrink-0"
-                        onchange="window.updateDateDisplay()"
-                    />
-                    <div class="min-w-0">
-                        <div class="font-bold text-sm uppercase text-yellow-400">🧪 Test Mode</div>
-                        <div class="text-xs text-gray-500">Use July 10, 2025 for testing</div>
-                    </div>
-                </label>
-            </div>
-
-            <div id="date-display" class="mb-4 p-3 bg-gray-950 rounded-xl text-center">
-                <div class="text-xs text-gray-500 uppercase mb-1">Fetching Games For</div>
-                <div id="fetch-date" class="font-mono font-bold text-blue-400 text-sm"></div>
-            </div>
-
             <button 
                 onclick="window.findGames(event)"
                 class="w-full bg-green-600 hover:bg-green-500 px-4 sm:px-6 py-3 sm:py-4 rounded-xl font-black uppercase transition-colors mb-4 text-sm sm:text-base"
@@ -190,36 +169,11 @@
         window.pollInterval = null;
         window.currentPot = 0;
         
-        // Date configuration
+        // Date configuration - auto-detect
         const TEST_DATE = '2025-07-10';
         const SPRING_TRAINING_START = new Date('2025-02-20');
         
         console.log("MANAGER SYSTEM BOOTED");
-        
-        // Initialize date display
-        window.updateDateDisplay = function() {
-            const testMode = document.getElementById('test-mode').checked;
-            const today = new Date().toISOString().split('T')[0];
-            const fetchDate = testMode ? TEST_DATE : today;
-            document.getElementById('fetch-date').innerText = fetchDate;
-            
-            // Clear game selection if date changes
-            const select = document.getElementById('game-select');
-            if (select) {
-                select.classList.add('hidden');
-                select.innerHTML = '<option value="">-- SELECT GAME --</option>';
-            }
-        };
-        
-        // Set initial date display on load
-        window.addEventListener('DOMContentLoaded', () => {
-            // Auto-enable test mode if before spring training
-            const now = new Date();
-            if (now < SPRING_TRAINING_START) {
-                document.getElementById('test-mode').checked = true;
-            }
-            window.updateDateDisplay();
-        });
 
         // 2. ADD PLAYER
         window.addPlayer = function() {
@@ -243,14 +197,15 @@
             ).join('');
         };
 
-        // 4. FETCH GAMES (DYNAMIC DATE)
+        // 4. FETCH GAMES (AUTO-DETECT DATE)
         window.findGames = async function(e) {
             try {
-                const testMode = document.getElementById('test-mode').checked;
+                // Auto-detect: use test date if before spring training, otherwise use today
+                const now = new Date();
                 const today = new Date().toISOString().split('T')[0];
-                const fetchDate = testMode ? TEST_DATE : today;
+                const fetchDate = (now < SPRING_TRAINING_START) ? TEST_DATE : today;
                 
-                console.log(`Fetching games for ${fetchDate} (Test Mode: ${testMode})`);
+                console.log(`Fetching games for ${fetchDate}`);
                 
                 const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${fetchDate}`);
                 const data = await resp.json();
@@ -259,7 +214,7 @@
                 select.innerHTML = '<option value="">-- SELECT GAME --</option>';
                 
                 if (!data.dates || !data.dates[0] || !data.dates[0].games || data.dates[0].games.length === 0) {
-                    alert(`No games found for ${fetchDate}. Try enabling Test Mode or selecting a different date.`);
+                    alert(`No games found for ${fetchDate}.`);
                     return;
                 }
                 

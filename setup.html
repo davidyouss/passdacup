@@ -108,20 +108,20 @@
             <p class="text-gray-600 text-xs mt-3">Share this with players to view live scores</p>
         </div>
 
-        <div class="bg-gradient-to-r from-blue-900 to-blue-800 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-blue-700 text-center">
-            <p class="text-gray-400 text-xs uppercase mb-2">Currently At Bat</p>
-            <p id="up-now" class="text-3xl sm:text-4xl font-black"></p>
-        </div>
-
+        <!-- POT DISPLAY -->
         <div class="bg-gradient-to-r from-green-900 to-green-800 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-green-700 text-center">
             <p class="text-gray-400 text-xs uppercase mb-2">Current Pot</p>
             <p id="pot-display" class="text-3xl sm:text-4xl font-black font-mono">$0.00</p>
         </div>
 
-        <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-gray-800">
-            <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-3 gap-2">
-                <h2 class="text-sm font-black uppercase text-gray-500">Live Feed</h2>
-                <span id="replay-status" class="text-xs text-gray-600"></span>
+        <!-- AT BAT + LIVE FEED COMBINED -->
+        <div class="bg-gradient-to-r from-blue-900 to-blue-800 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-blue-700">
+            <div class="flex justify-between items-center mb-3">
+                <div class="flex items-baseline gap-2">
+                    <span class="text-gray-400 text-xs uppercase">At Bat:</span>
+                    <span id="up-now" class="text-2xl sm:text-3xl font-black text-blue-300"></span>
+                </div>
+                <span id="replay-status" class="text-xs text-gray-500"></span>
             </div>
             <p id="pbp-text" class="text-white italic text-sm">Waiting for first pitch...</p>
         </div>

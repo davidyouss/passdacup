@@ -17,8 +17,9 @@
     
     <div class="max-w-2xl mx-auto">
         
-        <!-- Compact header -->
+        <!-- Compact header with logo -->
         <div class="text-center mb-4">
+            <img src="logo.png" alt="Pass Da Cup" class="w-20 sm:w-24 mx-auto mb-2" />
             <h1 class="text-2xl sm:text-4xl font-black mb-1" id="game-title">LIVE SESSION</h1>
             <p class="text-gray-600 text-xs uppercase tracking-wider">Scoreboard</p>
         </div>
@@ -51,22 +52,18 @@
     </div>
 
     <script>
-        // Supabase setup
         const S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         const S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         const sb = supabase.createClient(S_URL, S_KEY);
 
-        // Get game ID from URL
         const params = new URLSearchParams(window.location.search);
         const gameId = params.get('id');
 
         if (!gameId) {
             document.body.innerHTML = '<div class="text-center mt-20"><h1 class="text-4xl font-black mb-4">❌ NO GAME ID</h1><p class="text-gray-500">Please use the link from the manager.</p></div>';
         } else {
-            // Load initial data
             loadGame();
             
-            // Set up real-time subscription
             const channel = sb.channel('game-updates')
                 .on('postgres_changes', 
                     { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` },
@@ -77,7 +74,6 @@
                 )
                 .subscribe();
 
-            // Also poll every 5 seconds as backup
             setInterval(loadGame, 5000);
         }
 
@@ -97,7 +93,6 @@
         }
 
         function updateUI(game) {
-            // Update sync time
             const now = new Date();
             document.getElementById('sync-time').innerText = now.toLocaleTimeString('en-US', { 
                 hour: 'numeric', 
@@ -105,28 +100,19 @@
                 second: '2-digit'
             });
 
-            // Update game title if available
-            if (game.game_name) {
-                document.getElementById('game-title').innerText = game.game_name;
-            }
-
-            // Update pot
             const pot = parseFloat(game.pot_total || 0);
             document.getElementById('pot-display').innerText = `$${pot.toFixed(2)}`;
 
-            // Update current player
             const players = game.players || [];
             const currentIdx = game.current_holder_index || 0;
             if (players[currentIdx]) {
                 document.getElementById('up-now').innerText = players[currentIdx].name;
             }
 
-            // Update play-by-play
             if (game.last_event) {
                 document.getElementById('pbp-text').innerText = game.last_event;
             }
 
-            // Update standings
             const ledger = document.getElementById('ledger-list');
             ledger.innerHTML = players.map((p, i) => 
                 `<div class="flex justify-between items-center mb-2 text-sm sm:text-base ${i === currentIdx ? 'text-blue-400 font-black' : 'text-gray-400'}">

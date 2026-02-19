@@ -7,18 +7,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Ensure no horizontal scroll */
         body {
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
         }
-        
-        /* Make tap targets bigger on mobile */
         button, input, select {
             min-height: 44px;
         }
-        
-        /* Prevent zoom on input focus on iOS */
         input, select, textarea {
             font-size: 16px;
         }
@@ -28,8 +23,9 @@
     
     <!-- SETUP AREA -->
     <div id="setup-area" class="max-w-2xl mx-auto">
+        <!-- Logo Header -->
         <div class="text-center mb-6">
-            <h1 class="text-4xl sm:text-6xl font-black mb-2">🍺 PASS DA CUP</h1>
+            <img src="logo.png" alt="Pass Da Cup" class="w-40 sm:w-56 mx-auto mb-2" />
             <p class="text-gray-500 uppercase tracking-widest text-xs">Manager Setup</p>
         </div>
 
@@ -37,7 +33,6 @@
         <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-gray-800">
             <h2 class="text-lg sm:text-xl font-black mb-3 sm:mb-4 uppercase">Add Players</h2>
             
-            <!-- Input and button in single row that FITS on mobile -->
             <div class="flex gap-2 mb-4">
                 <input 
                     type="text" 
@@ -94,15 +89,15 @@
         </div>
     </div>
 
-    <!-- REMOTE CONTROL AREA (HIDDEN AT START) -->
+    <!-- REMOTE CONTROL AREA -->
     <div id="remote" class="hidden max-w-2xl mx-auto">
         <div class="text-center mb-6">
+            <img src="logo.png" alt="Pass Da Cup" class="w-24 sm:w-32 mx-auto mb-2" />
             <h1 class="text-2xl sm:text-4xl font-black mb-2" id="game-title-display"></h1>
             <p class="text-gray-500 uppercase tracking-widest text-xs">Manager Remote</p>
             <p id="game-status-display" class="text-xs text-blue-400 mt-2"></p>
         </div>
 
-        <!-- SHARE LINK -->
         <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-gray-800 text-center">
             <button 
                 onclick="window.copyShareLink(this)"
@@ -113,19 +108,16 @@
             <p class="text-gray-600 text-xs mt-3">Share this with players to view live scores</p>
         </div>
 
-        <!-- CURRENT AT BAT -->
         <div class="bg-gradient-to-r from-blue-900 to-blue-800 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-blue-700 text-center">
             <p class="text-gray-400 text-xs uppercase mb-2">Currently At Bat</p>
             <p id="up-now" class="text-3xl sm:text-4xl font-black"></p>
         </div>
 
-        <!-- POT DISPLAY -->
         <div class="bg-gradient-to-r from-green-900 to-green-800 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-green-700 text-center">
             <p class="text-gray-400 text-xs uppercase mb-2">Current Pot</p>
             <p id="pot-display" class="text-3xl sm:text-4xl font-black font-mono">$0.00</p>
         </div>
 
-        <!-- PLAY BY PLAY -->
         <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-gray-800">
             <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-3 gap-2">
                 <h2 class="text-sm font-black uppercase text-gray-500">Live Feed</h2>
@@ -134,7 +126,6 @@
             <p id="pbp-text" class="text-white italic text-sm">Waiting for first pitch...</p>
         </div>
 
-        <!-- LEDGER -->
         <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-gray-800" id="manager-controls">
             <h2 class="text-lg sm:text-xl font-black mb-4 uppercase">Standings</h2>
             <div id="ledger-list"></div>
@@ -146,7 +137,6 @@
             </button>
         </div>
 
-        <!-- SETTLEMENT AREA -->
         <div id="settlement-area" class="hidden">
             <div class="bg-gray-900 rounded-2xl p-4 sm:p-6 border-2 border-gray-800">
                 <h2 class="text-xl sm:text-2xl font-black mb-4 sm:mb-6 uppercase text-center">💸 Final Settlement</h2>
@@ -156,7 +146,6 @@
     </div>
 
     <script>
-        // 1. CONFIGURATION & SETUP
         window.S_URL = 'https://yhywgwohyzrcbzgxxtyb.supabase.co';
         window.S_KEY = 'sb_publishable_zYteMuxmxLbR0mxUDe8a3w_8brmZ2sv';
         window.sb = supabase.createClient(window.S_URL, window.S_KEY);
@@ -169,13 +158,11 @@
         window.pollInterval = null;
         window.currentPot = 0;
         
-        // Date configuration - Use 7/10/2025 until 2/20/2026, then switch to current date
         const TEST_DATE = '2025-07-10';
         const SPRING_TRAINING_START = new Date('2026-02-20T00:00:00');
         
         console.log("MANAGER SYSTEM BOOTED");
 
-        // 2. ADD PLAYER
         window.addPlayer = function() {
             const el = document.getElementById('p-input');
             if (!el || !el.value) return;
@@ -185,7 +172,6 @@
             window.draw();
         };
 
-        // 3. DRAW LINEUP
         window.draw = function() {
             const listEl = document.getElementById('p-list');
             if (!listEl) return;
@@ -197,15 +183,13 @@
             ).join('');
         };
 
-        // 4. FETCH GAMES - Use 7/10/2025 until 2/20/2026, then switch to live
         window.findGames = async function(e) {
             try {
-                // Use test date until Feb 20, 2026, then switch to current date
                 const now = new Date();
                 const today = new Date().toISOString().split('T')[0];
                 const fetchDate = (now < SPRING_TRAINING_START) ? TEST_DATE : today;
                 
-                console.log(`Fetching games for ${fetchDate} (Spring training starts: ${SPRING_TRAINING_START.toLocaleDateString()})`);
+                console.log(`Fetching games for ${fetchDate}`);
                 
                 const resp = await fetch(`https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&date=${fetchDate}`);
                 const data = await resp.json();
@@ -222,7 +206,6 @@
                     let opt = document.createElement('option');
                     opt.value = g.gamePk;
                     
-                    // Format game status
                     const status = g.status.detailedState;
                     let statusText = '';
                     
@@ -244,14 +227,13 @@
                 
                 select.classList.remove('hidden');
                 if (e && e.target) e.target.classList.add('hidden');
-                console.log(`${data.dates[0].games.length} games loaded successfully`);
+                console.log(`${data.dates[0].games.length} games loaded`);
             } catch (err) { 
                 console.error("API Error:", err);
-                alert("Error loading games. Check console for details.");
+                alert("Error loading games.");
             }
         };
 
-        // 5. START GAME
         window.startGame = async function() {
             if (window.roster.length < 2) return alert("ADD 2+ PLAYERS!");
             const sel = document.getElementById('game-select');
@@ -287,31 +269,23 @@
             }
 
             window.selectedGamePk = sel.value;
-            
-            // Adjust polling interval based on game status
             const pollSpeed = (gameStatus === 'In Progress' || gameStatus === 'Live') ? 5000 : 10000;
             window.pollInterval = setInterval(window.checkMLB, pollSpeed);
             
-            console.log(`Game started! Polling every ${pollSpeed/1000} seconds... (Status: ${gameStatus})`);
+            console.log(`Game started! Polling every ${pollSpeed/1000}s`);
         };
 
-        // 6. REPLAY ENGINE
         window.checkMLB = async function() {
             try {
                 const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${window.selectedGamePk}/playByPlay`);
                 const data = await resp.json();
                 const nextIdx = window.lastIdx + 1;
                 
-                if (!data.allPlays) {
-                    console.log("No plays data yet...");
-                    return;
-                }
+                if (!data.allPlays) return;
                 
-                // Check if we've reached the end
                 if (nextIdx >= data.allPlays.length) {
-                    console.log("Game over! All plays processed.");
                     clearInterval(window.pollInterval);
-                    document.getElementById('pbp-text').innerText = "🏁 GAME OVER - All plays complete";
+                    document.getElementById('pbp-text').innerText = "🏁 GAME OVER";
                     window.runSettlement();
                     return;
                 }
@@ -328,11 +302,10 @@
                     window.lastIdx = nextIdx;
                 }
             } catch (e) { 
-                console.log("Feed check error:", e); 
+                console.log("Feed error:", e); 
             }
         };
 
-        // 7. PROCESS MOVE
         window.processMove = async function(type, desc) {
             const { data } = await window.sb.from('games').select('*').eq('id', window.r_id);
             if (!data || !data[0]) return;
@@ -342,14 +315,12 @@
             let list = g.players;
             let i = g.current_holder_index;
 
-            // GAME RULES
             if (type.includes('strikeout')) {
                 pot += (window.unit * 2);
                 list[i].balance -= (window.unit * 2);
-                console.log(`⚾ STRIKEOUT! ${list[i].name} pays $${window.unit * 2}`);
             } 
             else if (type.includes('walk') || type.includes('hit_by_pitch')) {
-                console.log(`🚶 WALK/HBP - no payment, rotating...`);
+                // no payment
             }
             else if (type.includes('out') || type.includes('groundout') || type.includes('flyout') || 
                      type.includes('pop_out') || type.includes('lineout') || type.includes('field_out') ||
@@ -357,38 +328,29 @@
                      type.includes('sac_fly') || type.includes('sac_bunt')) {
                 pot += window.unit;
                 list[i].balance -= window.unit;
-                console.log(`❌ OUT! ${list[i].name} pays $${window.unit}`);
             }
             else if (type.includes('single')) {
                 let win = Math.min(pot, window.unit);
                 pot -= win;
                 list[i].balance += win;
-                console.log(`💰 SINGLE! ${list[i].name} wins $${win}`);
             }
             else if (type.includes('double')) {
                 let win = Math.min(pot, window.unit * 2);
                 pot -= win;
                 list[i].balance += win;
-                console.log(`💰💰 DOUBLE! ${list[i].name} wins $${win}`);
             }
             else if (type.includes('triple')) {
                 let win = Math.min(pot, window.unit * 3);
                 pot -= win;
                 list[i].balance += win;
-                console.log(`💰💰💰 TRIPLE! ${list[i].name} wins $${win}`);
             }
             else if (type.includes('home_run')) {
                 list[i].balance += pot;
-                console.log(`🏆 HOME RUN! ${list[i].name} wins ENTIRE POT: $${pot}`);
                 pot = 0;
-            }
-            else {
-                console.log(`⚠️ Unhandled event: ${type}`);
             }
 
             let next_i = (i + 1) % list.length;
             
-            // Update pot display
             window.currentPot = pot;
             document.getElementById('pot-display').innerText = `$${pot.toFixed(2)}`;
             
@@ -402,7 +364,6 @@
             }).eq('id', window.r_id);
         };
 
-        // 8. UI REFRESH
         window.updateManagerUI = function(list, activeIdx) {
             const upNowEl = document.getElementById('up-now');
             if (upNowEl) upNowEl.innerText = list[activeIdx].name;
@@ -420,7 +381,6 @@
             ).join('');
         };
 
-        // 9. SETTLEMENT
         window.runSettlement = async function() {
             const { data } = await window.sb.from('games').select('*').eq('id', window.r_id);
             if (!data || data.length === 0) return;
@@ -431,7 +391,7 @@
             if (takers.length === 0) {
                 document.getElementById('settlement-list').innerHTML = 
                     `<div class="p-4 text-center text-xs text-gray-500 border border-dashed border-gray-800 rounded-xl uppercase">
-                        NO WINNERS YET. NEED AT LEAST ONE PERSON IN THE GREEN.
+                        NO WINNERS YET.
                     </div>`;
                 document.getElementById('settlement-area').classList.remove('hidden');
                 return;
@@ -458,13 +418,30 @@
                         <span class="text-green-500 truncate">${t.t}</span>
                     </div>
                     <div class="text-[9px] text-gray-500 tracking-[0.4em] mt-1">PAYS</div>
-                </div>`).join('');
+                </div>`).join('') + `
+                <div class="mt-6 pt-6 border-t border-gray-800 text-center">
+                    <div class="mb-4">
+                        <p class="text-gray-500 text-xs mb-2 uppercase tracking-wide">Help us improve</p>
+                        <a href="YOUR_GOOGLE_FORM_LINK_HERE" target="_blank" 
+                           class="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm underline transition-colors">
+                            <span>📝</span>
+                            <span>Quick feedback (30 seconds)</span>
+                        </a>
+                    </div>
+                    
+                    <p class="text-gray-500 text-xs mb-3 uppercase tracking-wide">Game worked smoothly?</p>
+                    <a href="https://buymeacoffee.com/passdacup" target="_blank" 
+                       class="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black uppercase transition-colors text-sm shadow-lg">
+                        <span class="text-xl">🍺</span>
+                        <span>Buy the developer a beer</span>
+                    </a>
+                    <p class="text-gray-600 text-[10px] mt-2">Thanks for using Pass Da Cup!</p>
+                </div>`;
             
             document.getElementById('settlement-area').classList.remove('hidden');
             document.getElementById('manager-controls').classList.add('hidden');
         };
 
-        // 10. SHARE LINK
         window.copyShareLink = function(btn) {
             const url = window.location.origin + window.location.pathname.replace('setup.html', 'index.html') + "?id=" + window.r_id;
             navigator.clipboard.writeText(url).then(() => {

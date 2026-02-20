@@ -135,6 +135,7 @@
             >
                 💰 SETTLE UP
             </button>
+            <p class="text-gray-500 text-xs text-center mt-2">Click when game ends to finalize payouts</p>
         </div>
 
         <div id="settlement-area" class="hidden">
@@ -157,6 +158,8 @@
         window.unit = 5;
         window.pollInterval = null;
         window.currentPot = 0;
+        window.catchUpMode = false;
+        window.catchUpInterval = null;
         
         const TEST_DATE = '2025-07-10';
         const SPRING_TRAINING_START = new Date('2026-02-20T00:00:00');
@@ -269,38 +272,74 @@
             }
 
             window.selectedGamePk = sel.value;
-            const pollSpeed = (gameStatus === 'In Progress' || gameStatus === 'Live') ? 5000 : 10000;
-            window.pollInterval = setInterval(window.checkMLB, pollSpeed);
             
-            console.log(`Game started! Polling every ${pollSpeed/1000}s`);
+            // Start with catch-up mode to process any past plays
+            window.catchUpMode = true;
+            console.log('Starting catch-up mode...');
+            window.checkMLB(); // Immediate first check
+            
+            // Catch-up uses faster polling (500ms)
+            window.catchUpInterval = setInterval(window.checkMLB, 500);
+            
+            console.log(`Game started! Game ID: ${window.r_id}`);
         };
 
         window.checkMLB = async function() {
             try {
                 const resp = await fetch(`https://statsapi.mlb.com/api/v1/game/${window.selectedGamePk}/playByPlay`);
                 const data = await resp.json();
+                
+                if (!data.allPlays || data.allPlays.length === 0) return;
+                
+                const totalPlays = data.allPlays.length;
                 const nextIdx = window.lastIdx + 1;
                 
-                if (!data.allPlays) return;
-                
-                if (nextIdx >= data.allPlays.length) {
-                    clearInterval(window.pollInterval);
-                    document.getElementById('pbp-text').innerText = "🏁 GAME OVER";
-                    window.runSettlement();
-                    return;
-                }
-                
-                if (data.allPlays[nextIdx]) {
+                // CATCH-UP MODE: Rapidly process past plays
+                if (window.catchUpMode) {
+                    if (nextIdx >= totalPlays) {
+                        // Caught up! Switch to live mode
+                        console.log('✅ Catch-up complete! Switching to live mode...');
+                        window.catchUpMode = false;
+                        clearInterval(window.catchUpInterval);
+                        
+                        // Start normal polling (5s for live, 10s for finished)
+                        const pollSpeed = 5000;
+                        window.pollInterval = setInterval(window.checkMLB, pollSpeed);
+                        
+                        document.getElementById('replay-status').innerText = `🔴 LIVE - Play #${totalPlays} of ${totalPlays}`;
+                        return;
+                    }
+                    
+                    // Process next play in catch-up
                     const play = data.allPlays[nextIdx];
                     const event = (play.result.event || "").toLowerCase();
                     const desc = play.result.description || "In progress...";
                     
                     document.getElementById('pbp-text').innerText = desc;
-                    document.getElementById('replay-status').innerText = `PLAY #${nextIdx + 1} OF ${data.allPlays.length}`;
+                    document.getElementById('replay-status').innerText = `⏩ Catching up... Play #${nextIdx + 1} of ${totalPlays}`;
                     
                     await window.processMove(event, desc);
                     window.lastIdx = nextIdx;
+                    return;
                 }
+                
+                // LIVE MODE: Wait for new plays
+                if (nextIdx >= totalPlays) {
+                    // No new plays yet, just waiting
+                    return;
+                }
+                
+                // New play available!
+                const play = data.allPlays[nextIdx];
+                const event = (play.result.event || "").toLowerCase();
+                const desc = play.result.description || "In progress...";
+                
+                document.getElementById('pbp-text').innerText = desc;
+                document.getElementById('replay-status').innerText = `🔴 LIVE - Play #${nextIdx + 1} of ${totalPlays}`;
+                
+                await window.processMove(event, desc);
+                window.lastIdx = nextIdx;
+                
             } catch (e) { 
                 console.log("Feed error:", e); 
             }
@@ -422,7 +461,7 @@
                 <div class="mt-6 pt-6 border-t border-gray-800 text-center">
                     <div class="mb-4">
                         <p class="text-gray-500 text-xs mb-2 uppercase tracking-wide">Help us improve</p>
-                        <a href="https://forms.gle/xviGbwZtqhrkfeE78" target="_blank" 
+                        <a href="YOUR_GOOGLE_FORM_LINK_HERE" target="_blank" 
                            class="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm underline transition-colors">
                             <span>📝</span>
                             <span>Quick feedback (30 seconds)</span>

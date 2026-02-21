@@ -298,7 +298,7 @@
                 if (window.catchUpMode) {
                     if (nextIdx >= totalPlays) {
                         // Caught up! Switch to live mode
-                        console.log('✅ Catch-up complete! Switching to live mode...');
+                        console.log(`✅ Catch-up complete! Processed ${totalPlays} plays. Switching to live mode...`);
                         window.catchUpMode = false;
                         clearInterval(window.catchUpInterval);
                         
@@ -314,6 +314,11 @@
                     const play = data.allPlays[nextIdx];
                     const event = (play.result.event || "").toLowerCase();
                     const desc = play.result.description || "In progress...";
+                    
+                    // LOG DURING CATCH-UP
+                    if (nextIdx % 10 === 0 || event.includes('home_run')) {
+                        console.log(`⏩ Play #${nextIdx + 1}: ${event} - ${desc.substring(0, 50)}...`);
+                    }
                     
                     document.getElementById('pbp-text').innerText = desc;
                     document.getElementById('replay-status').innerText = `⏩ Catching up... Play #${nextIdx + 1} of ${totalPlays}`;
@@ -357,9 +362,10 @@
             if (type.includes('strikeout')) {
                 pot += (window.unit * 2);
                 list[i].balance -= (window.unit * 2);
+                console.log(`⚾ K! ${list[i].name} pays $${window.unit * 2} | Pot: $${pot}`);
             } 
             else if (type.includes('walk') || type.includes('hit_by_pitch')) {
-                // no payment
+                console.log(`🚶 Walk/HBP - ${list[i].name} - no payment | Pot: $${pot}`);
             }
             else if (type.includes('out') || type.includes('groundout') || type.includes('flyout') || 
                      type.includes('pop_out') || type.includes('lineout') || type.includes('field_out') ||
@@ -367,25 +373,34 @@
                      type.includes('sac_fly') || type.includes('sac_bunt')) {
                 pot += window.unit;
                 list[i].balance -= window.unit;
+                console.log(`❌ Out! ${list[i].name} pays $${window.unit} | Pot: $${pot}`);
             }
             else if (type.includes('single')) {
                 let win = Math.min(pot, window.unit);
                 pot -= win;
                 list[i].balance += win;
+                console.log(`💰 Single! ${list[i].name} wins $${win} | Pot: $${pot}`);
             }
             else if (type.includes('double')) {
                 let win = Math.min(pot, window.unit * 2);
                 pot -= win;
                 list[i].balance += win;
+                console.log(`💰💰 Double! ${list[i].name} wins $${win} | Pot: $${pot}`);
             }
             else if (type.includes('triple')) {
                 let win = Math.min(pot, window.unit * 3);
                 pot -= win;
                 list[i].balance += win;
+                console.log(`💰💰💰 Triple! ${list[i].name} wins $${win} | Pot: $${pot}`);
             }
             else if (type.includes('home_run')) {
+                let potWon = pot;
                 list[i].balance += pot;
                 pot = 0;
+                console.log(`🏆 HOME RUN! ${list[i].name} wins ENTIRE POT: $${potWon}`);
+            }
+            else {
+                console.log(`⚠️ UNHANDLED: "${type}" - no payment | Pot: $${pot}`);
             }
 
             let next_i = (i + 1) % list.length;

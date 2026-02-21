@@ -359,6 +359,23 @@
             let list = g.players;
             let i = g.current_holder_index;
 
+            // Skip non-batting events (no rotation, no payment)
+            if (!type || type === '' || 
+                type.includes('substitution') || 
+                type.includes('defensive') || 
+                type.includes('offensive') ||
+                type.includes('picked_off') ||
+                type.includes('stolen_base') ||
+                type.includes('caught_stealing') ||
+                type.includes('wild_pitch') ||
+                type.includes('passed_ball') ||
+                type.includes('balk') ||
+                type.includes('error')) {
+                console.log(`⏭️ Skip: "${type}" (non-batting event)`);
+                // Don't update database - just skip this entirely
+                return;
+            }
+
             if (type.includes('strikeout')) {
                 pot += (window.unit * 2);
                 list[i].balance -= (window.unit * 2);
